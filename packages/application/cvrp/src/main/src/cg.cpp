@@ -54,7 +54,8 @@ namespace RouteOpt::Application::CVRP {
 
     bool tellIfInt(const std::vector<double> &X, const std::vector<SequenceInfo> &cols) {
         bool is_integer = true;
-        for (int i = 0; i < X.size(); ++i) {
+        // for (int i = 0; i < X.size(); ++i) {
+        for (int i = 3; i < X.size(); ++i) {
             auto val = X[i];
             if (val < TOLERANCE) continue;
             if ((cols[i].forward_concatenate_pos < -1) || (std::abs(val - 1) > TOLERANCE)) {
@@ -68,12 +69,20 @@ namespace RouteOpt::Application::CVRP {
     void updateIPOptSol(const std::vector<double> &X, const std::vector<SequenceInfo> &cols,
                         std::vector<std::vector<int> > &ip_opt_sol) {
         ip_opt_sol.clear();
-        for (int i = 0; i < cols.size(); ++i) {
+        // for (int i = 0; i < cols.size(); ++i) {
+        for (int i = 1; i < cols.size(); ++i) {
             if (cols[i].col_seq.empty()) continue;
-            if (X[i] > 0.5) {
+            // if (X[i] > 0.5) {
+            if (X[i+2] > 0.5) {
                 ip_opt_sol.emplace_back(cols[i].col_seq);
+                std::cout << "IP Opt Sol: ";
+                for (const auto &j: cols[i].col_seq) {
+                    std::cout << j << " ";
+                }
+                std::cout << ", x = " << X[i+2] << std::endl;
             }
         }
+        std::cout << "m = " << X[1] << ", n = " << X[2] << std::endl;
     }
 
     void updateAverageRouteLength(CVRP_Pricing &pricing_controller, BbNode *node) {
@@ -207,7 +216,7 @@ namespace RouteOpt::Application::CVRP {
             std::vector<double> dual(num_row, 0);
             pricing_controller.refIncumbentDualSolution() = {dual, 0.};
             SAFE_SOLVER(node->refSolver().getDual(0, num_row, dual.data()))
-
+            std::cout << "Stabilization: initialize dual solution." << std::endl;
 
             if (equalFloat(node->getValue(), 0)) {
                 // std::cout << "adjust the stab delta!" << std::endl;
@@ -262,6 +271,7 @@ namespace RouteOpt::Application::CVRP {
                                            const std::vector<SequenceInfo> &cols, bool &if_integer, bool &if_feasible) {
         if (tellIfInt(X, cols)) if_integer = true;
         else {
+
             if_integer = false;
             if_feasible = false;
             return;
@@ -269,17 +279,19 @@ namespace RouteOpt::Application::CVRP {
         if (val + TOLERANCE < ub) {
             std::vector<double> sol;
             std::vector<SequenceInfo> sols;
-            for (int i = 0; i < cols.size(); ++i) {
+            // for (int i = 0; i < cols.size(); ++i) {
+            for (int i = 3; i < cols.size(); ++i) {
                 if (X[i] > 0.5) {
                     sol.emplace_back(X[i]);
-                    sols.emplace_back(cols[i]);
+                    sols.emplace_back(cols[i-2]);
                 }
             }
             checkSolutionFeasibility(sol, sols, if_feasible);
-            if (if_feasible) {
+            if (if_feasible) {             
                 ub = val;
                 updateIPOptSol(X, cols, ip_opt_sol);
                 std::cout << "\x1b[36mUpdated UB: " << ub << "\x1b[0m" << std::endl;
+                // exit(0);
             }
         } else {
             if_feasible = true;
@@ -294,6 +306,7 @@ namespace RouteOpt::Application::CVRP {
 
         int num_row;
         SAFE_SOLVER(node->refSolver().getNumRow(&num_row))
+        // std::cout << "Number of rows in the node: " << num_row << std::endl;
         std::vector<double> pi4_labeling(num_row);
         bool if_integer, if_feasible;
         int ccnt = 0;
@@ -305,6 +318,11 @@ namespace RouteOpt::Application::CVRP {
         double mt = 0, spt = 0;
         int num_col;
         std::vector<double> X;
+
+        // std::vector<int> cbeg;
+        // std::vector<int> cind;
+        // std::vector<double> cval;
+        // int numnzP;
 
         printTypeLabeling(cg_mode);
 
@@ -334,6 +352,7 @@ namespace RouteOpt::Application::CVRP {
 
 
             updateIntegerSolution(prior_value, X, node->getCols(), if_integer, if_feasible);
+            
 
             if (if_integer && !if_feasible && !if_fix_row) {
                 addFeasibilityCuts(num_row, X, node->getCols(), node->refRCCs(),
@@ -369,10 +388,15 @@ namespace RouteOpt::Application::CVRP {
 
             SAFE_SOLVER(node->refSolver().getDual(0, num_row, pi4_labeling.data()))
 
+            int size;
+            size = node->getRCCs().size() + node->getR1Cs().size() + node->getBrCs().size();
+
             pricing_controller.priceConstraints(node->getRCCs(),
                                                 node->getR1Cs(),
                                                 node->getBrCs(),
                                                 pi4_labeling);
+            
+            // pricing_controller.updateBigL_U(cval, X, num_col);
 
             ++iter;
 
@@ -398,12 +422,14 @@ namespace RouteOpt::Application::CVRP {
                         break;
                 }
             });
+
+
             spt += t_pricing;
             if (cg_mode == PRICING_LEVEL::EXACT)pricing_controller.refTimePricing().updateAverage(t_pricing);
             if (cg_mode == PRICING_LEVEL::EXACT && !pricing_controller.getIfCompleteCG())goto BREAK;
 
             if (!node->getIfTerminate())add_column_controller.addColumns(ccnt, pi4_labeling, true);
-
+            std::cout << "Columns generated in this iteration: " << ccnt << std::endl;
             if (ccnt == 0) {
                 if (cg_mode == PRICING_LEVEL::EXACT) optimal_dual_vector = pi4_labeling;
                 goto BREAK;
@@ -451,7 +477,7 @@ namespace RouteOpt::Application::CVRP {
         constexpr bool if_stabilization = IF_USE_STAB;
 
         if (if_stabilization) {
-            // std::cout << "open stabilization but not in exact phase!" << std::endl;
+            std::cout << "open stabilization but not in exact phase!" << std::endl;
             StabilizationDetail::initializeStabilizationColumns(pricing_controller, node, ub);
         }
 
@@ -465,8 +491,9 @@ namespace RouteOpt::Application::CVRP {
                                     if_possible_terminate_early, if_fix_row,
                                     if_fix_meet_point, if_allow_delete_col, true, if_stabilization);
         }
-
+        
         if (if_open_exact) {
+            std::cout << "open exact phase!" << std::endl;
             runColumnGenerationType(node, PRICING_LEVEL::EXACT, time_limit, if_possible_terminate_early,
                                     if_fix_row,
                                     if_fix_meet_point, if_allow_delete_col, false, false);
@@ -475,7 +502,6 @@ namespace RouteOpt::Application::CVRP {
             SAFE_SOLVER(node->refSolver().getNumCol(&num_col))
             if (num_col > LP_COL_FINAL_LIMIT && if_allow_delete_col) node->cleanIndexColForNode();
         }
-
 
         if (if_update_node_val) {
             if (node->getIfTerminate()) {
@@ -554,7 +580,7 @@ namespace RouteOpt::Application::CVRP {
         int num_row;
         SAFE_SOLVER(node->refSolver().getNumRow(&num_row))
         std::vector<double> pi4_labeling(num_row);
-        //
+        std::cout << "solveLPByInspection, num_rows = " << num_row << std::endl;
         bool if_integer, if_feasible;
         int ccnt = 0;
         int iter = 0;

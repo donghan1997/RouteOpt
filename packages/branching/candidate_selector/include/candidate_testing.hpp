@@ -71,6 +71,19 @@ namespace RouteOpt::Branching::CandidateSelector {
             CANDIDATE_SELECTOR_VERBOSE_EXEC(
                 PRINT_REMIND("no " + marker + " testing is needed: too few candidates: " + std::to_string(branch_pair.
                     size())))
+            switch (phase) {
+                case TestingPhase::LP:
+                    NoEdgeCandidate_LP = true;
+                    break;
+                case TestingPhase::Heuristic:
+                    NoEdgeCandidate_Heuristic = true;
+                    break;
+                case TestingPhase::Exact:
+                    NoEdgeCandidate_Exact = true;
+                    break;
+                default:
+                    THROW_RUNTIME_ERROR("invalid phase");
+            }
             return;
         }
 
@@ -107,6 +120,27 @@ namespace RouteOpt::Branching::CandidateSelector {
             CandidateSelectorDetail::printScore(edge_info);
         )
     }
+
+
+
+    // void testing_range_branch(Node *node) {
+    
+        
+
+    //     // std::vector<double> rhs_m_n(4);
+    //     // SAFE_SOLVER(node->refSolver().getRhs(3*start, 4, rhs_m_n.data()))
+    //     // if ((std::abs(xval[branch_var_idx_m]-rhs_m_n[0]) <= TOLERANCE) && (std::abs(xval[branch_var_idx_m]-rhs_m_n[1]) <= TOLERANCE)) {
+    //     //     branch_on_m = false;
+    //     //     branch_on_n = true;
+    //     // }
+    //     // if ((std::abs(xval[branch_var_idx_n]-rhs_m_n[2]) <= TOLERANCE) && (std::abs(xval[branch_var_idx_n]-rhs_m_n[3]) <= TOLERANCE)) {
+    //     //     branch_on_n = false;
+    //     //     branch_on_m = true;
+    //     // }
+
+    // }
+
+
 
 
     template<typename Node, typename BrCType, typename Hasher>

@@ -40,13 +40,18 @@ namespace RouteOpt::Application::CVRP {
             outer_bin_but_keep_len = {0, 0};
         }
         int min_sorted_b = dir ? -1 : num_buckets_per_vertex;
+        // std::cout << "min_sorted_b= " << min_sorted_b << std::endl;
         for (int b = (dir ? 0 : num_buckets_per_vertex - 1); (dir ? b < num_buckets_per_vertex : b >= 0); (
                  dir ? ++b : --b)) {
+            // std::cout << "b= " << b << std::endl;
             for (auto &comp: dir ? topological_order_forward_ptr->at(b) : topological_order_backward_ptr->at(b)) {
                 int index = 0;
             STILL_EXIST:
+                // std::cout << "comp.size()= " << comp.size() << std::endl;
+                // print comp;
                 for (; index < comp.size(); ++index) {
                     int i = comp[index];
+                    // std::cout << "i= " << i << std::endl;
                     auto &valid_num =
                             dir
                                 ? if_exist_extra_labels_in_forward_sense[i][b].second
@@ -58,6 +63,9 @@ namespace RouteOpt::Application::CVRP {
                                 : if_exist_extra_labels_in_backward_sense[i][b].first;
                     for (int vec_index = 0; vec_index < valid_num; ++vec_index) {
                         auto &ki = label_array[vec_index];
+                        // // print label ki
+                        // std::cout << "ki= " << ki->end_vertex
+                        //           << " cost= " << ki->cost << ", last vertex= " << ki->p_label->end_vertex << std::endl;
                         if (ki->is_extended) continue;
                         checkIfDominated<dir, pricing_level>(ki, i, b, if_suc);
                         ki->is_extended = true;

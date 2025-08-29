@@ -17,6 +17,7 @@ namespace RouteOpt::Application::CVRP {
     RE_TRY:
         runLabeling<true, false, false, if_symmetry, PRICING_LEVEL::EXACT>(time_limit);
 
+
         if (if_short_memory) {
             reallocateLabel();
             initializeLabels<if_symmetry>();

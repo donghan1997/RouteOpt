@@ -13,6 +13,7 @@
 namespace RouteOpt::RCCs::RCGetter {
     void RCCRCController::priceRCC(const std::vector<Rcc> &rccs, const std::vector<double> &pi_vector,
                                    std::vector<std::vector<double> > &chg_cost_mat4_vertex) {
+        // std::cout << "Statring to price RCC cuts..." << std::endl;
         double rc;
         for (auto &rcc: rccs) {
             if (rcc.form_rcc == static_cast<int>(RCCForm::RCC_FORM_1)) {

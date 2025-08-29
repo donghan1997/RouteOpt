@@ -9,9 +9,11 @@
 #define ROUTE_OPT_CVRP_MACRO_HPP
 #include <Eigen/Sparse>
 #include "route_opt_macro.hpp"
+// #include "cvrp.hpp"
 
 namespace RouteOpt::Application::CVRP {
-    constexpr double TIME_LIMIT{std::numeric_limits<float>::max()};
+    // constexpr double TIME_LIMIT{std::numeric_limits<float>::max()};
+    constexpr double TIME_LIMIT{3600.0};
 
     enum class APPLICATION_TYPE {
         CVRP,
@@ -115,7 +117,7 @@ namespace RouteOpt::Application::CVRP {
     constexpr int MaxNumRoutesInExactPricingLow = 100;
     constexpr int MaxNumRoutesInExactPricingHigh = 1000;
     constexpr int MaxNumRoutesInHeavierHeur = 30;
-    constexpr int MaxNumRoutesInLighterHeur = 30;
+    constexpr int MaxNumRoutesInLighterHeur = 60;
     constexpr double CUTTING_BRANCHING_RATIO = 0.2;
     constexpr double CUTTING_BRANCHING_RATIO_LOW = 0.1;
     constexpr double FracMemTolerance = 0.8;
@@ -124,7 +126,10 @@ namespace RouteOpt::Application::CVRP {
     constexpr double FeasibilityTol = 1e-7;
     constexpr int LP_COL_FINAL_LIMIT = 10000;
     constexpr double COL_KEEP_FRAC = 0.67;
-    constexpr double EDGE_IF_ONE_TOLERANCE = 1e-4;
+    constexpr double EDGE_IF_ONE_TOLERANCE = 1e-1;
+
+    // static double BIG_M = 0.0; // This is the big M value used in the solver.
+    // static double Budget = 0.0; // This is the budget value used in the solver.
 
 
     constexpr double HEURISTIC_LIGHT_TESTING_MAX_COLUMN_RATIO = 1.5;

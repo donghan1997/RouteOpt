@@ -98,6 +98,8 @@ namespace RouteOpt::Application::CVRP {
             //at least be 1!
             num_buckets_per_vertex = static_cast<int>(std::floor(
                                          resource.resources[0] / step_size)) + 1;
+            std::cout << "num_buckets_per_vertex= " << num_buckets_per_vertex
+                      << " step_size= " << step_size << std::endl;
         }
 
 
@@ -172,7 +174,7 @@ namespace RouteOpt::Application::CVRP {
         resource.resources[CapResourceIdx] = roundAndConvertResLong(cap);
         if constexpr (CapResourceIdx == 0)
             meet_point_resource_in_bi_dir =
-                    static_cast<double>(resource.resources[CapResourceIdx]) / 2;
+                    static_cast<double>(resource.resources[CapResourceIdx]);
         if (resource_across_arcs_in_forward_sense.empty()) {
             resource_across_arcs_in_forward_sense.resize(dim);
             for (auto &vertex: resource_across_arcs_in_forward_sense) vertex.resize(dim);

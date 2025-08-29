@@ -9,6 +9,7 @@
 #define ROUTE_OPT_CALL_BRANCHING_HPP
 #include <numeric>
 #include <route_opt_macro.hpp>
+#include "global_config.hpp"
 
 namespace RouteOpt::Application::CVRP {
     namespace TestingDetail {
@@ -23,6 +24,12 @@ namespace RouteOpt::Application::CVRP {
                     cind.emplace(cind.begin(), 0);
                     cval.emplace(cval.begin(), 1);
                 }
+                // print the branch constraint
+                // std::cout << "branch constraint: ";
+                // for (const auto &i: cind) {
+                //     std::cout << i << " ";
+                // }
+                // std::cout << std::endl;
                 SAFE_SOLVER(node_solver.addConstraint(cind.size(), cind.data(), cval.data(), SOLVER_EQUAL, 1, nullptr))
             } else {
                 if (cind.front() == 0) {
@@ -33,6 +40,54 @@ namespace RouteOpt::Application::CVRP {
             }
             SAFE_SOLVER(node_solver.updateModel())
         }
+
+
+        inline void addCustomerBranchConstraint(
+            std::vector<int> &cind,
+            std::vector<double> &cval,
+            Solver &node_solver, bool dir = false) {   
+            
+            // print the branch constraint
+            // std::cout << "branch constraint: ";
+            // for (const auto &i: cind) {
+            //     std::cout << i << " ";
+            // }
+            // std::cout << std::endl;
+            if (dir) {
+                if (cind.front() == 0) {
+                cval.front() = 1;
+                } else {
+                    cind.emplace(cind.begin(), 0);
+                    cval.emplace(cval.begin(), 1);
+                }
+                SAFE_SOLVER(node_solver.addConstraint(cind.size(), cind.data(), cval.data(), SOLVER_EQUAL, 1, nullptr))
+            } else {
+                if (cind.front() == 0) {
+                    cind.erase(cind.begin());
+                    cval.erase(cval.begin());
+                }
+                SAFE_SOLVER(node_solver.addConstraint(cind.size(), cind.data(), cval.data(), SOLVER_EQUAL, 0, nullptr))
+            }
+            SAFE_SOLVER(node_solver.updateModel())
+        }
+
+        inline void addRangeBranchConstraint(int row_idx, double value, Solver &node_solver){
+
+            // std::cout << "add range branch constraint at row " << row_idx << " with value " << value << std::endl;
+            std::vector<double> values(1, value);
+            SAFE_SOLVER(node_solver.setRhs(row_idx, 1, values.data()))
+            SAFE_SOLVER(node_solver.updateModel())
+        }
+
+        inline void addRangeConstraint(std::vector<int> &cind,
+            std::vector<double> &cval,
+            Solver &node_solver) {
+
+            SAFE_SOLVER(node_solver.addConstraint(cind.size(), cind.data(), cval.data(), SOLVER_EQUAL, 0, nullptr))
+            SAFE_SOLVER(node_solver.updateModel())
+
+        }
+
 
         inline void inverseLastBranchConstraint(Solver &node_solver) {
             SAFE_SOLVER(node_solver.updateModel())
@@ -79,6 +134,7 @@ namespace RouteOpt::Application::CVRP {
         void callPricingInTesting(CVRPSolver *cvrp, BbNode *node, double &tmp_val) {
             int num_col;
             SAFE_SOLVER(node->refSolver().getNumCol(&num_col))
+            // std::cout << "callPricingInTesting, num_cols = " << num_col << std::endl;
             if (node->getIfInEnumState()) {
                 callInspectionInTesting(cvrp, node);
             } else {
@@ -87,6 +143,7 @@ namespace RouteOpt::Application::CVRP {
             SAFE_SOLVER(node->refSolver().getObjVal(&tmp_val))
             int new_num_col;
             SAFE_SOLVER(node->refSolver().getNumCol(&new_num_col))
+            // std::cout << "After callPricingInTesting, num_cols = " << new_num_col << std::endl;
 
             std::vector<int> col_idx(new_num_col - num_col);
             std::iota(col_idx.begin(), col_idx.end(), num_col);
@@ -173,6 +230,7 @@ namespace RouteOpt::Application::CVRP {
 
         SAFE_SOLVER(node_solver.reoptimize(SOLVER_BARRIER))
         SAFE_SOLVER(node_solver.getObjVal(&tmp_val))
+
         dif1 = TestingDetail::calculateDifference(tmp_val, org_val);
 
         if constexpr (ml_type != ML_TYPE::ML_NO_USE) {
@@ -195,6 +253,8 @@ namespace RouteOpt::Application::CVRP {
     };
 
     inline void BbNode::obtainBrcMap() {
+
+        // std::cout << "number of routes : " << cols.size() << std::endl;
         if (!edge_col_map.empty()) return;
         // std::unordered_map<std::pair<int, int>, std::vector<std::pair<int, int> > > edge_col_map{}; //edge, col idx, cnt
         for (int i = 0; i < static_cast<int>(cols.size()); ++i) {
@@ -279,7 +339,8 @@ namespace RouteOpt::Application::CVRP {
         val.resize(size);
         int cnt = 0;
         for (auto &col: map_[edge]) {
-            ind[cnt] = col.first;
+            // ind[cnt] = col.first;
+            ind[cnt] = col.first > 0 ? col.first + 2 : col.first;
             val[cnt++] = col.second;
         }
     }
@@ -329,7 +390,12 @@ namespace RouteOpt::Application::CVRP {
         edge_map.reserve(dim * dim);
         auto &cols = node->cols;
         std::vector<double> x(cols.size());
-        SAFE_SOLVER(node->solver.getX(0, cols.size(), x.data()))
+
+        // SAFE_SOLVER(node->solver.getX(0, cols.size(), x.data()))
+        SAFE_SOLVER(node->solver.getX(2, cols.size(), x.data()))
+        std::vector<double> x0(1);
+        SAFE_SOLVER(node->solver.getX(0, 1, x0.data()))
+        x[0] = x0[0];
         for (int i = 0; i < cols.size(); ++i) {
             const auto val = x[i];
             if (val < SOL_X_TOLERANCE) continue;
@@ -342,8 +408,22 @@ namespace RouteOpt::Application::CVRP {
             }
             if (seq.size() != 1) edge_map[{0, b4}] += val; //if single point, just be one count;
         }
+
+        // print the edge_map
+        global_config.ALL_EDGES_IF_ONE = true; //assume all edges are 1.
+        std::cout << "Edge map size: " << edge_map.size() << std::endl;
+        for (const auto &pair : edge_map) {
+            std::cout << "Edge: " << pair.first.first << "-" << pair.first.second
+                      << ", Value: " << pair.second << std::endl;
+            if (!equalFloat(pair.second, 1., EDGE_IF_ONE_TOLERANCE))
+                global_config.ALL_EDGES_IF_ONE = false; //if one edge is not 1, then set the flag to false
+        }
+        // exit(0);    
+
+
         //check the edge
         for (auto &brc: node->brcs) {
+            if ((brc.edge.first==node->getDim()) && (brc.edge.second==node->getDim())) continue; //skip the 0-0 edge
             if (brc.br_dir) {
                 if (!equalFloat(edge_map[brc.edge], 1., EDGE_IF_ONE_TOLERANCE)) {
                     //print the col

@@ -195,6 +195,7 @@ namespace RouteOpt::Branching {
         std::vector<BrCType> branch_pair{};
         // Map storing candidate and their associated nonzero values.
         std::unordered_map<BrCType, double, Hasher> candidate_map{};
+        
     };
 } // namespace RouteOpt::Branching
 

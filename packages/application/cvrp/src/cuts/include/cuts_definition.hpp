@@ -21,6 +21,10 @@ namespace RouteOpt::Application::CVRP {
         std::pair<int, int> edge;
         int idx_brc{INVALID_BRC_INDEX};
         bool br_dir;
+
+        std::pair<int, int> range; // int for index of m and n, double for bigL or bigU value.
+        int last_customer_idx{-1}; // The last customer index for branch on customer.
+
     };
 }
 

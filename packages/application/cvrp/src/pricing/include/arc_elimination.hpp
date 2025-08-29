@@ -110,6 +110,9 @@ namespace RouteOpt::Application::CVRP {
         int &num_forward_jump_arcs,
         int &num_backward_jump_arcs
     ) {
+
+        return;
+        
         if (!determineIfArcElimination(ub, opt_gap, last_gap)) return;
 
         std::cout << SMALL_PHASE_SEPARATION;

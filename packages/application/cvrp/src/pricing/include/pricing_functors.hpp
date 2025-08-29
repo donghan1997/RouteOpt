@@ -8,14 +8,27 @@
 #ifndef ROUTE_OPT_PRICING_FUNCTORS_HPP
 #define ROUTE_OPT_PRICING_FUNCTORS_HPP
 #include "cvrp_pricing_controller.hpp"
+#include "global_config.hpp"
 
 namespace RouteOpt::Application::CVRP {
     inline bool CVRP_Pricing::increaseMainResourceConsumption(const Resource &nowResource,
                                                               Resource &newResource, int start, int end) {
         newResource = nowResource + resource_across_arcs_in_forward_sense[start][end];
-        if (tellResTupleRelations<'p'>(newResource, ub4_vertex[end])) return false;
+        if (tellResTupleRelations<'p'>(newResource, ub4_vertex[end])) 
+        {   
+            // std::cout << newResource << " " << ub4_vertex[end] << std::endl;
+            
+            return false;
+        
+        }
         newResource.takeLarger(lb4_vertex[end]);
-        if (tellResTupleRelations<'c'>(newResource, resource_across_arcs_in_forward_sense[end][0])) return false;
+        if (tellResTupleRelations<'c'>(newResource, resource_across_arcs_in_forward_sense[end][0])) {
+
+            // std::cout << newResource << " " << resource_across_arcs_in_forward_sense[end][0] << std::endl;
+
+            return false;
+
+        }
         return true;
     }
 
@@ -56,7 +69,80 @@ namespace RouteOpt::Application::CVRP {
     }
 
     inline void CVRP_Pricing::addPathByRC(double path_rc, Label *ki, Label *kj, int num) {
-        if (path_rc < rc_std) {
+        
+        // 1. First check two labels ki and kj if they are not null
+        // 2. if one of them is null, then the label is one direction generated, we can only find the last vertex of the path
+
+        // 3. if both are not null, then we can find the whole path, and find the last vertex of the path
+        std::vector<int> col{};
+        Label *p;
+        p = ki;
+        // std::cout << "cost = " << p->cost << std::endl;
+        while (p && p->end_vertex) {
+            col.emplace_back(p->end_vertex);
+            p = p->p_label;
+        }
+        std::reverse(col.begin(), col.end());
+        // std::cout << "col: ";
+        // for (int i = 0; i < col.size(); ++i) {
+        //     std::cout << col[i] << " ";
+        // }
+        // std::cout << std::endl;
+
+        if (kj) {
+            p = kj;
+            while (p && p->end_vertex) {
+                col.emplace_back(p->end_vertex);
+                p = p->p_label;
+            }
+        }
+
+        int last_customer = col.back();
+        int size = static_cast<int>(col.size());
+        double cost = cost_mat4_vertex_ref.get()[0][col[0]];
+        for (int j = 0; j < size-1; ++j) {
+            cost += cost_mat4_vertex_ref.get()[col[j]][col[j+1]];
+        }
+        cost += cost_mat4_vertex_ref.get()[col[size-1]][0];
+
+        // print path
+        double delta = dual_vector[dim+last_customer] * cost + 
+                        dual_vector[2 * dim - 1 + last_customer] * (cost - global_config.BIG_M); // 2 * dim - 1 + last_customer maps 
+        path_rc -= delta;
+
+        for (auto &brc: brcs_from_node) {
+            if ((brc.edge.first == dim) && (brc.edge.second == dim)) {
+                int idx = brc.idx_brc;
+                if (idx == INVALID_BRC_INDEX) continue;
+                if ((brc.range.first == 1) && (cost - brc.range.second >= TOLERANCE)) { // m
+                    path_rc -= dual_vector[idx];
+                }
+                if ((brc.range.first == 2) && (cost - brc.range.second <= TOLERANCE)) { // n
+                    path_rc -= dual_vector[idx];
+                }
+                if (col.back() == brc.last_customer_idx) {
+                    path_rc -= dual_vector[idx];
+                }
+            }
+        }
+
+        // std::cout << SMALL_PHASE_SEPARATION;
+        // for (int i = 2*dim; i < 3*dim-1; ++i) {
+        //     std::cout << dual_vector[i] << " ";
+        // }
+        // std::cout << std::endl;
+        // exit(0);
+        // for (int i = 0; i < size; ++i) {
+        //     std::cout << col[i] << " ";
+        // }
+        // std::cout << " | rc= " << path_rc << " | cost = " << cost << std::endl;
+        
+
+        if ((path_rc < rc_std)) {
+            // for (int i = 0; i < size; ++i) {
+            //     std::cout << col[i] << " ";
+            // }
+            // std::cout << " | rc= " << path_rc << " | cost = " << cost << std::endl;
             negative_rc_label_tuple.emplace_back(ki, kj, path_rc);
             if (negative_rc_label_tuple.size() >= num)
                 rc_std = std::get<2>(negative_rc_label_tuple[negative_rc_label_tuple.size() - num]);
@@ -126,6 +212,8 @@ namespace RouteOpt::Application::CVRP {
                 if (!can_leave_depot_forward.test(i)) continue;
                 auto &new_label = all_label[i];
                 new_label.rc = chg_cost_mat4_vertex[0][i];
+                new_label.cost = cost_mat4_vertex_ref.get()[0][i];
+                // std::cout << " i = " << i << ", new label cost = " << new_label.cost << std::endl;
                 new_label.is_extended = false;
                 rank1_rc_controller_ref.get().updateR1CStates(new_label.rc, new_label.r1c, all_label->r1c, 0, i);
                 auto bin = static_cast<int>(new_label.res.resources[0] / step_size);
@@ -134,6 +222,7 @@ namespace RouteOpt::Application::CVRP {
                 auto &bucket2 = if_exist_extra_labels_in_forward_sense[i][bin];
                 bucket2.first[bucket2.second++] = all_label + i;
                 auto rc_return = new_label.rc + chg_cost_mat4_vertex[i][0];
+
                 if (adjust_brc_dual4_single_route.find(i) != adjust_brc_dual4_single_route.end()) {
                     rc_return += adjust_brc_dual4_single_route[i];
                 }
@@ -179,6 +268,7 @@ namespace RouteOpt::Application::CVRP {
                                                           int &if_state) {
         double path_rc;
         double &which_rc = if_std_optgap ? opt_gap : rc_std;
+        // std::cout << "opt_gap = " << opt_gap << ", rc_std = " << rc_std << std::endl;
         auto ptr_rc_till_this_bin = &rc2_till_this_bin_in_forward_sense[j][arr_bj];
         auto ptr_rc_bin = &rc2_bin_in_forward_sense[j][arr_bj];
         if constexpr ((dir && !if_symmetry) || (!dir && if_symmetry)) {
@@ -229,15 +319,21 @@ namespace RouteOpt::Application::CVRP {
 
     template<bool dir, bool if_last_half, bool if_complete, bool if_symmetry, bool if_std_optgap, bool if_res_updated,
         PRICING_LEVEL pricing_level>
-    void CVRP_Pricing::updateLabel(const Resource &res, Label *ki, int i, int j, int &bj,
+    void CVRP_Pricing::updateLabel(const Resource &res, Label *ki, int i, int j, int &bj, // initialize label cost, //update cost label, //  
                                    bool &if_suc) {
         if_suc = false;
         if (ki->pi[j]) return;
         auto new_label = all_label + idx_glo;
+        new_label->p_label = ki; /// debugging, need remove
         auto &tmp_res = new_label->res;
         auto &tmp_rc = new_label->rc;
+        // std::cout << "tmp_rc = " << tmp_rc << std::endl;
         tmp_rc = ki->rc + chg_cost_mat4_vertex[i][j]; //real rc
-
+        // std::cout << "tmp_rc = " << tmp_rc << std::endl;
+        auto &tmp_cost = new_label->cost;
+        // std::cout << "tmp_cost = " << tmp_cost << std::endl;
+        tmp_cost = ki->cost + cost_mat4_vertex_ref.get()[i][j];
+        // std::cout << "tmp_cost = " << tmp_cost << "cost_mat4_vertex_ref = " << cost_mat4_vertex_ref.get()[i][j] << std::endl;
 
         if constexpr (!if_complete) {
             if constexpr (!if_res_updated) {
@@ -321,8 +417,8 @@ namespace RouteOpt::Application::CVRP {
                 j = pr.second;
                 res.resources[0] = pr.first;
             }
-
-            updateLabel<dir, if_last_half, if_complete, if_symmetry, false, false, pricing_level>(
+            // std::cout << "UpdateLabel start: i= " << i << ", j= " << j << std::endl;
+            updateLabel<dir, if_last_half, if_complete, if_symmetry, false, false, pricing_level>( //update cost, high efficient, 
                 res, ki, i, j, bj,
                 if_suc);
 

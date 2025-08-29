@@ -15,23 +15,90 @@ namespace RouteOpt::Application::CVRP {
                                         const std::vector<Brc> &brcs,
                                         const std::vector<double> &pi_vector) {
         pricePartitioning(pi_vector);
+        pricePartitioningByCustomers(brcs, pi_vector);
         RCCs::RCGetter::RCCRCController::priceRCC(rccs, pi_vector, chg_cost_mat4_vertex);
         priceBRC(brcs, pi_vector);
         //price rank1 cuts;
         rank1_rc_controller_ref.get().getRank1DualsInCG(r1cs, pi_vector);
     }
 
+    // void CVRP_Pricing::updateBigL_U(const std::vector<double> &cval, const std::vector<double> &X, const int &num_col) {
+
+    //     double UB_L = X[1];
+    //     double UB_U = -std::numeric_limits<double>::infinity();
+
+    //     for (int i = 3; i < num_col; ++i) {
+    //         if (X[i] > TOLERANCE) {
+    //             UB_U = std::max(UB_U, cval[i-2]);
+    //         }
+    //     }
+
+    //     big_U = (1+ alpha) * UB_L;
+
+    //     if ((big_U - UB_U) >= TOLERANCE) {
+    //         big_U = (UB_U + UB_L) / 2;
+    //     }
+
+    //     double LB_U = X[2];
+    //     double LB_L = std::numeric_limits<double>::infinity();
+    //     for (int i = 3; i < num_col; ++i) {
+    //         if (X[i] > TOLERANCE) {
+    //             LB_L = std::min(LB_L, cval[i-2]);
+    //         }
+    //     }
+
+    //     big_L = (1 - alpha) * LB_U;
+
+    //     if ((big_L - LB_L) <= TOLERANCE) {
+    //         big_L = (LB_U + LB_L) / 2;
+    //     }
+
+    //     // std::cout << "big_L = " << big_L << ", big_U = " << big_U << std::endl;
+
+
+    // }
+
     void CVRP_Pricing::pricePartitioning(const std::vector<double> &pi_vector) {
         auto &cm = cost_mat4_vertex_ref.get();
+        // print cm
+        // for (int i = 0; i < dim; ++i) {
+        //     for (int j = 0; j < dim; ++j) {
+        //         std::cout << cm[i][j] << " ";
+        //     }
+        //     std::cout << std::endl;
+        // }
+        // exit(0);
+
+        // std::cout << SMALL_PHASE_SEPARATION;
+        // for (int i = 0; i <= dim-2; ++i) {
+        //     std::cout << pi_vector[i] << " ";
+        // }
+        // std::cout << std::endl;
+        // for (int i = dim-1; i <= dim-1; ++i) {
+        //     std::cout << pi_vector[i] << " ";
+        // }
+        // std::cout << std::endl;
+        // for (int i = dim; i <= dim; ++i) {
+        //     std::cout << pi_vector[i] << " ";
+        // }
+        // std::cout << std::endl;
+        // for (int i = dim+1; i <= 2*dim-1; ++i) {
+        //     std::cout << pi_vector[i] << " ";
+        // }
+        // std::cout << std::endl;
+        // for (int i = 2*dim; i <= 3*dim-2; ++i) {
+        //     std::cout << pi_vector[i] << " ";
+        // }
+        // std::cout << std::endl;
+
         auto real_dim = dim - 1;
         for (int i = 1; i < dim; ++i) {
             for (int j = i + 1; j < dim; ++j) {
-                chg_cost_mat4_vertex[i][j] = cm[i][j] - 0.5 * (pi_vector[i - 1] + pi_vector[j - 1]);
+                chg_cost_mat4_vertex[i][j] = - cm[i][j] * pi_vector[dim] - 0.5 * (pi_vector[i - 1] + pi_vector[j - 1]);
             }
         }
         for (int i = 1; i < dim; ++i) {
-            chg_cost_mat4_vertex[0][i] =
-                    cm[0][i] - 0.5 * (pi_vector[i - 1] + pi_vector[real_dim]);
+            chg_cost_mat4_vertex[0][i] = - cm[0][i] * pi_vector[dim]  - 0.5 * (pi_vector[i - 1] + pi_vector[real_dim]);
         }
         for (int i = 1; i < dim; ++i) {
             for (int j = i + 1; j < dim; ++j) {
@@ -41,11 +108,53 @@ namespace RouteOpt::Application::CVRP {
         for (int i = 1; i < dim; ++i) {
             chg_cost_mat4_vertex[i][0] = chg_cost_mat4_vertex[0][i];
         }
+
+        // print chg_cost_mat4_vertex
+        // std::cout << "chg_cost_mat4_vertex:" << std::endl;
+        // for (int i = 0; i < dim; ++i) {
+        //     for (int j = 0; j < dim; ++j) {
+        //         std::cout << chg_cost_mat4_vertex[i][j] << " ";
+        //     }
+        //     std::cout << std::endl;
+        // }
+        
+    }
+
+    void CVRP_Pricing::pricePartitioningByCustomers(const std::vector<Brc> &brcs, const std::vector<double> &pi_vector){
+
+        dual_vector = pi_vector;
+        beta_max = -std::numeric_limits<double>::infinity();
+        beta_min = std::numeric_limits<double>::infinity();
+        
+        for (int i = 1; i < dim; ++i) {
+            double beta = dual_vector[dim + i] + dual_vector[2 * dim - 1 + i];
+            if (beta > beta_max) beta_max = beta;
+            if (beta < beta_min) beta_min = beta;
+        }
+
+        // std::cout << "beta_max = " << beta_max << ", beta_min = " << beta_min << std::endl;
+        theta_max = 0.0;
+        for (auto &brc: brcs) {
+            if ((brc.edge.first==dim) && (brc.edge.second==dim)) {
+                if (brc.range.first == 1) { // m
+                    if (brc.range.second > theta_max) theta_max = brc.range.second;
+                }
+                if (brc.range.first == 2) { // n
+                    if (brc.range.second > theta_max) theta_max = brc.range.second;
+                }
+            }
+        }
+
+
+        brcs_from_node = brcs;
+        
+
     }
 
     void CVRP_Pricing::priceBRC(const std::vector<Brc> &brcs, const std::vector<double> &pi_vector) {
         adjust_brc_dual4_single_route.clear();
         for (auto &brc: brcs) {
+            if ((brc.edge.first==dim) && (brc.edge.second==dim)) continue; 
             if (!brc.br_dir) {
                 chg_cost_mat4_vertex[brc.edge.first][brc.edge.second] = std::numeric_limits<float>::max();
                 chg_cost_mat4_vertex[brc.edge.second][brc.edge.first] =

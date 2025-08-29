@@ -17,17 +17,21 @@ namespace RouteOpt::Branching::BKF {
     int BKFController::getBestK(const BKFDataShared &sharedData, double ub,
                                 double lb) {
         int num = static_cast<int>(all_n);
+        // std::cout << "all_n= " << all_n << std::endl;
         if (!if_init) {
             BKF_VERBOSE_EXEC(std::cout << "we directly test "<< num << std::endl;)
         QUIT:
+            // std::cout << "Best K = " << num << std::endl;
             if_init = true;
             return num;
         }
 
         num = static_cast<int>(est_m);
+        // std::cout << "est_m = " << est_m << std::endl;
 
         double beta;
         auto r_best = sharedData.getCurrentRBest();
+        // std::cout << "r_best= " << r_best << std::endl;
         if (r_best < TOLERANCE) goto QUIT;
         beta = std::max((ub - lb - sharedData.getF()) / r_best, 0.);
         if (beta > 16) goto QUIT;

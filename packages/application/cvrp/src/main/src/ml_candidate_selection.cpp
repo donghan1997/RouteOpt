@@ -27,6 +27,8 @@ namespace RouteOpt::Application::CVRP {
             route_length[i] = static_cast<int>(node->getCols()[i].col_seq.size());
         }
 
+        // std::cout << "callMLCandidateSelection: num_col : " << num_col << std::endl;
+
         data_shared.refCandidateMap() = BbNode::obtainSolEdgeMap(node);
 
         switch (ml_type) {
@@ -49,4 +51,24 @@ namespace RouteOpt::Application::CVRP {
         l2b_controller.cleanLastData();
         return data_shared.refBranchPair().front();
     }
+
+    // std::pair<int, int> CVRPSolver::callRangeSelection(BbNode *node,
+    //                                                          Branching::BranchingHistory<std::pair<int, int>,
+    //                                                              PairHasher> &history,
+    //                                                          Branching::BranchingDataShared<std::pair<int, int>,
+    //                                                              PairHasher> &data_shared,
+    //                                                          Branching::CandidateSelector::BranchingTesting<BbNode,
+    //                                                              std::pair<int, int>, PairHasher> &tester) {
+
+    //     int num_col;
+    //     SAFE_SOLVER(node->refSolver().getNumCol(&num_col))
+    //     std::vector<double> x(num_col);
+    //     SAFE_SOLVER(node->refSolver().getX(0, num_col, x.data()))
+
+    //     // Get the value of m and n
+
+
+
+
+    // }
 }

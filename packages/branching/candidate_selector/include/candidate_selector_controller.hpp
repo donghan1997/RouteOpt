@@ -23,6 +23,8 @@
 #include "route_opt_macro.hpp"
 #include "candidate_selector_macro.hpp"
 #include "branching_macro.hpp"
+#include "cvrp_macro.hpp"
+#include "global_config.hpp"
 
 namespace RouteOpt::Branching::CandidateSelector {
     /**
@@ -207,10 +209,38 @@ namespace RouteOpt::Branching::CandidateSelector {
                                         BranchingHistory<BrCType, Hasher> &branching_history,
                                         BranchingDataShared<BrCType, Hasher> &branching_data_shared,
                                         const std::unordered_map<BrCType, double, Hasher> &candidate_map) {
+
+            static BrCType dummy_default;
+            testing_range_branch(node);
+            if (node->getBranchOnM() || node->getBranchOnN()) {
+                std::cout << "Branching on range: " << (node->getBranchOnM() ? "M" : "N") 
+                    << ", big value: " << (node->getBranchOnM() ? node->getBigU() : node->getBigL()) << std::endl;
+                dummy_default.first = node->getDim();
+                dummy_default.second = node->getDim();
+                return dummy_default;
+            }
+
+            // here we are trying to branch on last customer
+            testing_last_customer_branch(node);
+            if (node->getBranchOnCustomer()) {
+                std::cout << "Branching on customer: " << node->getBranchCustomerIdx() << std::endl;
+                dummy_default.first = node->getDim();
+                dummy_default.second = node->getDim();
+                return dummy_default;
+            }
+
+            // exit(0);
+
+
+            NoEdgeCandidate_LP = false;
+            NoEdgeCandidate_Heuristic = false;
+            NoEdgeCandidate_Exact = false;
+
             // Update the candidate map in the shared data.
             branching_data_shared.refCandidateMap() = candidate_map;
             // Perform initial screening based on the LP phase.
             branching_history.initialScreen(branching_data_shared, num_phase0);
+
             // Measure LP testing time.
             lp_time_cnt.first = TimeSetter::measure([&]() {
                 testing(node, branching_history, branching_data_shared, TestingPhase::LP);
@@ -226,8 +256,15 @@ namespace RouteOpt::Branching::CandidateSelector {
                 testing(node, branching_history, branching_data_shared, TestingPhase::Exact);
             });
             exact_time_cnt.second = num_phase2 == 1 ? 0 : 2 * num_phase2;
-            // Return the best candidate as determined by the initial screening.
-            return branching_data_shared.refBranchPair().front();
+
+            if (NoEdgeCandidate_LP && NoEdgeCandidate_Heuristic && NoEdgeCandidate_Exact) {
+                // dummy_default = {0, 0};
+                // return dummy_default;
+                return branching_data_shared.refBranchPair().front();
+            }
+            else {
+                return branching_data_shared.refBranchPair().front();
+            }   
         }
 
         /**
@@ -246,6 +283,305 @@ namespace RouteOpt::Branching::CandidateSelector {
             BranchingHistory<BrCType, Hasher> &branching_history,
             BranchingDataShared<BrCType, Hasher> &branching_data_shared,
             TestingPhase phase);
+
+        
+        void testing_range_branch(Node *node) {
+            int num_col;
+            SAFE_SOLVER(node->refSolver().getNumCol(&num_col))
+
+            std::vector<double> xval(num_col);
+            SAFE_SOLVER(node->refSolver().getX(0, num_col, xval.data()))
+
+
+            bool branch_on_m = true;
+            bool branch_on_n = true;
+
+            int branch_var_idx_m = 1;
+            int branch_var_idx_n = 2;
+
+            double UB_L = xval[branch_var_idx_m];
+            double LB_U = xval[branch_var_idx_n];
+
+            // check if the UB_L and LB_U are integer
+            if (std::abs(UB_L - std::round(UB_L)) <= TOLERANCE) branch_on_m = false;
+            if (std::abs(LB_U - std::round(LB_U)) <= TOLERANCE) branch_on_n = false;
+
+            std::vector<int> cbeg;
+            std::vector<int> cind;
+            std::vector<double> cval;
+            int numnzP;
+            int start = node->getDim();
+            SAFE_SOLVER(node->refSolver().getConstraints(&numnzP, nullptr, nullptr, nullptr, start, 1))
+            cbeg.resize(numnzP+1);
+            cind.resize(numnzP);
+            cval.resize(numnzP);
+            SAFE_SOLVER(node->refSolver().getConstraints(&numnzP, cbeg.data(), cind.data(), cval.data(), start, 1))
+
+            std::vector<double> rhs_m_n(4);
+            SAFE_SOLVER(node->refSolver().getRhs(3*start-1+1, 4, rhs_m_n.data()))
+            double lb_m = rhs_m_n[0];
+            double ub_m = rhs_m_n[1];
+            double lb_n = rhs_m_n[2];
+            double ub_n = rhs_m_n[3];
+
+            int dim = node->getDim();
+            const auto &col = node->getCols();
+            std::vector<double> customer_cost_contribution_m(dim, 0.0);
+            std::vector<double> customer_cost_contribution_n(dim, 0.0);
+            std::vector<double> customer_x_contribution(dim, 0.0);
+
+            for (int i = 3; i < num_col; ++i) {
+                if (xval[i] > SOL_X_TOLERANCE) {
+                    auto &ci = col[i-2];
+                    auto &seq = ci.col_seq;
+                    double cost = cval[i-2];
+                    // find the last customer in the sequence
+                    if (!seq.empty()) {
+                        int last_customer = seq.back();
+                        customer_cost_contribution_m[last_customer] += cost * xval[i];
+                        customer_cost_contribution_n[last_customer] += (cost - global_config.BIG_M) * xval[i];
+                        customer_x_contribution[last_customer] += xval[i];
+                    }
+                }
+            }
+
+            for (int i = 1; i < dim; ++i) {
+                if (customer_x_contribution[i] > TOLERANCE)
+                    customer_cost_contribution_n[i] += global_config.BIG_M;
+            }
+
+
+            // print customer contribution
+            std::cout << "Customer contribution: " << std::endl;
+            for (int i = 0; i < dim; ++i) {
+                if (customer_x_contribution[i] > TOLERANCE)
+                    std::cout << "Customer " << i << ": " << customer_cost_contribution_m[i] << ", " 
+                        << customer_cost_contribution_n[i] << std::endl;
+            }
+
+            std::cout << "Customer x contribution: " << std::endl;
+            for (int i = 0; i < dim; ++i) {
+                if (customer_x_contribution[i] > TOLERANCE)
+                    std::cout << "Customer " << i << ": " << customer_x_contribution[i] << std::endl;
+            }
+
+
+            double max_m_bar = 0.0;
+            double real_n_bar = std::numeric_limits<double>::infinity();
+            double min_n_bar = std::numeric_limits<double>::infinity();
+            for (int i = 1; i < dim; ++i) {
+                if (customer_x_contribution[i] > TOLERANCE) {
+                    max_m_bar = std::max(max_m_bar, customer_cost_contribution_m[i]);
+                    real_n_bar = std::min(real_n_bar, customer_cost_contribution_m[i]);
+                    min_n_bar = std::min(min_n_bar, customer_cost_contribution_n[i]);
+                }
+            }
+
+            // std::cout << "max_m_bar = " << max_m_bar << ", min_n_bar = " << min_n_bar << ", real_n_bar = " << real_n_bar << std::endl;
+
+
+            if (!branch_on_m && !branch_on_n) {
+                std::cout << "Both m and n are integer, no need to branch" << std::endl;
+                if ((max_m_bar < min_n_bar) && (max_m_bar > lb_m + TOLERANCE) && (max_m_bar < ub_m - TOLERANCE)) {
+                    node->setBranchOnM(true);
+                    node->setBranchOnN(false);
+                    node->setBigU(max_m_bar);
+                    std::cout << "set big_U = " << max_m_bar << std::endl;
+                    return;
+                }
+                node->setBranchOnM(branch_on_m);
+                node->setBranchOnN(branch_on_n);
+
+                return;
+            }
+
+
+
+
+            // find the largest contribution in the customer_contribution vector
+            double max_contribution = 0.0;
+            int last_customer = -1;
+            for (int i = 1; i < dim; ++i) {
+                if (equalFloat(customer_x_contribution[i], 1., TOLERANCE)) continue; // skip if the customer is not in the solution
+                if (customer_cost_contribution_m[i] > max_contribution) {
+                    max_contribution = customer_cost_contribution_m[i];
+                    last_customer = i;
+                }
+            }
+
+            std::cout << "last customer = " << last_customer << ", contribution = " << max_contribution << std::endl;
+
+
+
+
+            double UB_U = -std::numeric_limits<double>::infinity();
+            for (int i = 3; i < num_col; ++i) {
+                if (xval[i] > TOLERANCE) {
+                    UB_U = std::max(UB_U, cval[i-2]);
+                }
+            }
+
+
+            double LB_L = std::numeric_limits<double>::infinity();
+            for (int i = 3; i < num_col; ++i) {
+                if (xval[i] > TOLERANCE) {
+                    LB_L = std::min(LB_L, cval[i-2]);
+                }
+            }
+
+            if (UB_U - UB_L <= TOLERANCE) branch_on_m = false;
+            if (LB_U - LB_L <= TOLERANCE) branch_on_n = false;
+
+
+            if (!branch_on_m && !branch_on_n) {
+                std::cout << "Both m and n are range-respecting, no need to branch" << std::endl;
+                node->setBranchOnM(branch_on_m);
+                node->setBranchOnN(branch_on_n);
+                return;
+            }
+
+
+            double big_U = (1 + alpha) * UB_L;
+            double big_L = (1 - alpha) * LB_U;
+
+            if ((big_U - lb_m <= TOLERANCE) || (big_U - ub_m >= TOLERANCE)) branch_on_m = false;
+            if ((big_L - lb_n <= TOLERANCE) || (big_L - ub_n >= TOLERANCE)) branch_on_n = false;
+
+
+            if (!branch_on_m && !branch_on_n) {
+                std::cout << "Both big U and big L are out of range, no need to branch" << std::endl;
+                node->setBranchOnM(branch_on_m);
+                node->setBranchOnN(branch_on_n);
+                return;
+            }
+
+
+            if (branch_on_m && branch_on_n) {
+                branch_on_m = false;
+            }
+
+            if (branch_on_m) std::cout << "branch_on_m = true" << std::endl;
+            if (branch_on_n) std::cout << "branch_on_n = true" << std::endl;
+
+            node->setBigU(big_U);
+            node->setBigL(big_L);
+
+            node->setBranchOnM(branch_on_m);
+            node->setBranchOnN(branch_on_n);
+
+            node->setBranchOnCustomer(false);
+            node->setBranchCustomerIdx(-1);
+            
+
+            std::cout << "UB_L = " << UB_L << ", UB_U = " << UB_U << std::endl;
+            std::cout << "big_U = " << big_U << std::endl;
+
+
+            std::cout << "LB_U = " << LB_U << ", LB_L = " << LB_L << std::endl;
+            std::cout << "big_L = " << big_L << std::endl;
+
+        }
+
+        void testing_last_customer_branch(Node *node) {
+
+            // 1.1 check which last customer contribute to the largest route cost
+            // 1.2 check if the last customer is fractional
+            // 1.3 if yes, branch on it and return
+               // 1.3.1 branch into two children nodes, one with use this last customer as one of route, the other one without
+               // 1.3.2 add constriants to the two children nodes, one with x_{i,last_customer} = 1, the other one with x_{i,last_customer} = 0
+        
+            int num_col;
+            SAFE_SOLVER(node->refSolver().getNumCol(&num_col))
+            std::vector<double> xval(num_col);
+            SAFE_SOLVER(node->refSolver().getX(0, num_col, xval.data()))
+
+            int dim = node->getDim();
+            const auto &col = node->getCols();
+
+            std::vector<int> cbeg;
+            std::vector<int> cind;
+            std::vector<double> cval;
+            int numnzP;
+            SAFE_SOLVER(node->refSolver().getConstraints(&numnzP, nullptr, nullptr, nullptr, dim, 1))
+            cbeg.resize(numnzP+1);
+            cind.resize(numnzP);
+            cval.resize(numnzP);
+            SAFE_SOLVER(node->refSolver().getConstraints(&numnzP, cbeg.data(), cind.data(), cval.data(), dim, 1))
+
+            std::vector<double> customer_cost_contribution(dim, 0.0);
+            std::vector<double> customer_cost_contribution_n(dim, 0.0);
+            std::vector<double> customer_x_contribution(dim, 0.0);
+
+            for (int i = 3; i < num_col; ++i) {
+                if (xval[i] > SOL_X_TOLERANCE) {
+                    auto &ci = col[i-2];
+                    auto &seq = ci.col_seq;
+                    double cost = cval[i-2];
+                    // find the last customer in the sequence
+                    if (!seq.empty()) {
+                        int last_customer = seq.back();
+                        customer_cost_contribution[last_customer] += cost * xval[i];
+                        customer_cost_contribution_n[last_customer] += (cost - global_config.BIG_M) * xval[i];
+                        customer_x_contribution[last_customer] += xval[i];
+                    }
+                }
+            }
+
+
+            // print customer contribution
+            std::cout << "Customer contribution: " << std::endl;
+            for (int i = 0; i < dim; ++i) {
+                if (customer_cost_contribution[i] > TOLERANCE)
+                    std::cout << "Customer " << i << ": " << customer_cost_contribution[i] << ", " 
+                        << customer_cost_contribution_n[i] + global_config.BIG_M << std::endl;
+            }
+
+            std::cout << "Customer x contribution: " << std::endl;
+            for (int i = 0; i < dim; ++i) {
+                if (customer_x_contribution[i] > TOLERANCE)
+                    std::cout << "Customer " << i << ": " << customer_x_contribution[i] << std::endl;
+            }
+
+
+
+            // find the largest contribution in the customer_contribution vector
+            double max_contribution = 0.0;
+            int last_customer = -1;
+            for (int i = 1; i < dim; ++i) {
+                if (equalFloat(customer_x_contribution[i], 1., TOLERANCE)) continue; // skip if the customer is not in the solution
+                if (customer_cost_contribution[i] > max_contribution) {
+                    max_contribution = customer_cost_contribution[i];
+                    last_customer = i;
+                }
+            }
+
+            std::cout << "last customer = " << last_customer << ", contribution = " << max_contribution << std::endl;
+
+            // find the last brc
+            
+            if (last_customer == -1) {
+                std::cout << "last customer is already branched on, skip" << std::endl;
+                node->setBranchOnCustomer(false);
+                node->setBranchCustomerIdx(-1);
+                return;
+            }
+
+            node->setBranchOnCustomer(true);
+            node->setBranchCustomerIdx(last_customer);
+
+            node->setBranchOnM(false);
+            node->setBranchOnN(false);
+
+            
+        
+        
+        
+        
+        
+        
+        
+        
+        }
 
         /**
          * @brief Updates the BKF controllers with the measured testing times.

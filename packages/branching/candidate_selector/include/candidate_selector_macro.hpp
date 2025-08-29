@@ -47,6 +47,19 @@ namespace RouteOpt::Branching::CandidateSelector {
      */
     constexpr int PRINT_NUM_COLS = 5;
 
+    static bool NoEdgeCandidate_LP = false;
+
+    static bool NoEdgeCandidate_Heuristic = false;
+
+    static bool NoEdgeCandidate_Exact = false;
+
+    // static bool branch_on_m = false;
+    
+    // static bool branch_on_n = false;
+
+    constexpr double alpha = 0.01;
+
+
     /**
      * @brief Enumeration of testing phases for candidate selection.
      *

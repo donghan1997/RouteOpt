@@ -107,7 +107,7 @@ namespace RouteOpt::Branching::BBT {
                                processExactTestingFunction),
               pricing(pricing),
               cutting(cutting),
-              imposeBranching(imposeBranching),
+              imposeBranching(imposeBranching), //how to branching
               getBranchingCandidates(getBranchingCandidates),
               getBestCandidateBySelfDefined(getBestCandidateBySelfDefined),
               tryWriteNodeOut(tryWriteNodeOut),
@@ -262,11 +262,13 @@ namespace RouteOpt::Branching::BBT {
                 double minVal = std::numeric_limits<double>::infinity();
                 for (auto &nodePtr: tree) {
                     double val = valueExtractor(nodePtr);
+                    // std::cout << "val = " << val << std::endl;
                     if (val < minVal) {
                         minVal = val;
                     }
                 }
                 lb = minVal;
+                // std::cout << "lb = " << lb << std::endl;
             }
         }
 

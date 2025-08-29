@@ -16,6 +16,17 @@ namespace RouteOpt::Application::CVRP {
             std::sort(sort_col_idx.begin(), sort_col_idx.end());
         }
 
+        // decrese 2 for each column index
+        std::transform(sort_col_idx.begin(), sort_col_idx.end(), sort_col_idx.begin(),
+                       [](int i) { return i - 2; });
+        // print col_idx
+        // std::cout << "rmLPCols: ";
+        // for (const auto &i: sort_col_idx) {
+        //     std::cout << i << " ";
+        // }
+        // std::cout << std::endl;
+
+
         int num_col;
         SAFE_SOLVER(solver.getNumCol(&num_col))
         int delta = 0;
@@ -25,12 +36,25 @@ namespace RouteOpt::Application::CVRP {
             for (int j = *i + 1; j < *(i + 1); ++j) cols[j - delta] = cols[j];
         }
         ++delta;
-        for (int j = *stop_sign + 1; j < num_col; ++j) cols[j - delta] = cols[j];
+        for (int j = *stop_sign + 1; j < num_col-2; ++j) cols[j - delta] = cols[j];
+
+        // add 2 for each column index
+        std::transform(sort_col_idx.begin(), sort_col_idx.end(), sort_col_idx.begin(),
+                       [](int i) { return i + 2; });
 
         SAFE_SOLVER(solver.delVars(sort_col_idx.size(), sort_col_idx.data()))
         SAFE_SOLVER(solver.updateModel())
         SAFE_SOLVER(solver.getNumCol(&num_col))
-        cols.resize(num_col);
+        cols.resize(num_col-2);
+
+        // print cols
+        // for (const auto &col: cols) {
+        //     std::cout << "col_seq: ";
+        //     for (const auto &i: col.col_seq) {
+        //         std::cout << i << " ";
+        //     }
+        //     std::cout << std::endl;
+        // }
     }
 
 

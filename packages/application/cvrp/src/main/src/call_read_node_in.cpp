@@ -7,6 +7,8 @@
 
 #include "cvrp.hpp"
 #include "two_stage_controller.hpp"
+#include "cvrp_macro.hpp"
+#include "global_config.hpp"
 
 namespace RouteOpt::Application::CVRP {
     namespace InNodeNameSpace {
@@ -113,6 +115,8 @@ namespace RouteOpt::Application::CVRP {
             auto &cols = node->refCols();
             std::vector<int> solver_beg, solver_ind;
             std::vector<double> solver_val, solver_obj;
+            // std::vector<char> solver_vtype;
+            // std::vector<double> solver_lb, solver_ub;
 
             std::unordered_set<int> vis_single;
             for (auto &col: cols) {
@@ -123,6 +127,7 @@ namespace RouteOpt::Application::CVRP {
             }
 
             int row_vehicle = dim - 1;
+            int row_budget = dim;
             for (int i = 1; i < dim; ++i) {
                 if (vis_single.find(i) != vis_single.end()) continue;
                 cols.emplace_back();
@@ -130,11 +135,27 @@ namespace RouteOpt::Application::CVRP {
                 auto &col = cols.back();
                 col.col_seq.emplace_back(i);
                 col.forward_concatenate_pos = 0;
+
                 solver_ind.emplace_back(i - 1);
                 solver_val.emplace_back(1);
+
                 solver_ind.emplace_back(row_vehicle);
-                solver_val.emplace_back(1);
-                solver_obj.emplace_back(dis_mat[0][i] + dis_mat[i][0]);
+                solver_val.emplace_back(1.0);
+
+                solver_ind.emplace_back(row_budget);
+                double cost = dis_mat[0][i] + dis_mat[i][0];
+                solver_val.emplace_back(cost);
+
+                solver_ind.emplace_back(dim+i);
+                solver_val.emplace_back(cost);
+
+                solver_ind.emplace_back(2*dim-1+i);
+                solver_val.emplace_back(cost - global_config.BIG_M);
+                std::cout << "col " << i << " cost: " << cost << ", big_m = " << global_config.BIG_M << std::endl;
+                solver_obj.emplace_back(0.0);
+                // solver_vtype.emplace_back(SOLVER_CONTINUOUS);
+                // solver_lb.emplace_back(0.0);
+                // solver_ub.emplace_back(1.0);
             }
             solver_beg.emplace_back(static_cast<int>(solver_ind.size()));
             SAFE_SOLVER(node->refSolver().addVars(static_cast<int>(solver_beg.size())-1,
@@ -148,6 +169,8 @@ namespace RouteOpt::Application::CVRP {
                 nullptr,
                 nullptr))
             SAFE_SOLVER(node->refSolver().updateModel())
+            // SAFE_SOLVER(node->refSolver().write("model.lp"));
+            // exit(0);
         }
     }
 

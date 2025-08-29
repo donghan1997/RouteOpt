@@ -1,0 +1,34 @@
+NAME : XML10_1111_03
+COMMENT : Generated as the XML100 dataset from the CVRPLIB
+TYPE : CVRP
+DIMENSION : 11
+EDGE_WEIGHT_TYPE : EUC_2D
+CAPACITY : 4
+NODE_COORD_SECTION
+1    133  378 
+2    620  13  
+3    930  857 
+4    856  562 
+5    481  553 
+6    594  67  
+7    480  265 
+8    564  239 
+9    485  640 
+10   196  734 
+11   937  618 
+DEMAND_SECTION
+1    0   
+2    1   
+3    1   
+4    1   
+5    1   
+6    1   
+7    1   
+8    1   
+9    1   
+10   1   
+11   1   
+DEPOT_SECTION
+1
+-1
+EOF

@@ -1,5 +1,47 @@
+# ---- System / OS ----
 .DS_Store
-*.xml
+Thumbs.db
+
+# ---- IDE / Editor ----
+.vscode/
+.idea/
 *.iml
-.idea
-.gitignore.swp
+*.swp
+
+# ---- Build artifacts ----
+build/
+bin/
+lib/
+out/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# ---- Object and library files ----
+*.o
+*.obj
+*.a
+*.so
+*.so.*
+*.dll
+*.dylib
+
+# ---- Executables ----
+*.exe
+*.out
+*.run
+
+# ---- Logs and temporary ----
+*.log
+*.tmp
+
+# ---- Solver / Optimization files ----
+*.lp
+*.mps
+*.rlp
+*.sol
+
+# ---- Python cache (in case you use Python scripts) ----
+__pycache__/
+*.pyc

@@ -9,6 +9,7 @@
 #include "cvrp.hpp"
 #include "vrptw.hpp"
 #include "rank1_data_shared.hpp"
+#include "global_config.hpp"
 
 namespace RouteOpt::Application::CVRP {
     namespace CuttingDetail {
@@ -217,7 +218,7 @@ namespace RouteOpt::Application::CVRP {
             sol_x.resize(x.size());
             sols.resize(x.size());
             int sol_cnt = 0;
-            for (int i = 0; i < x.size(); ++i) {
+            for (int i = 3; i < x.size(); ++i) {
                 if (x[i] > SOL_X_TOLERANCE) {
                     sol_x[sol_cnt] = x[i];
                     sols[sol_cnt] = cols[i];
@@ -242,7 +243,7 @@ namespace RouteOpt::Application::CVRP {
                 if (it) {
                     if (equalFloat(rhs[k], 0)) {
                         if (it.col() != 0) {
-                            solver_ind[nz] = static_cast<int>(it.col());
+                            solver_ind[nz] = (static_cast<int>(it.col()) == 0) ? 0 : static_cast<int>(it.col()) + 2;
                             solver_val[nz] = it.value();
                             ++nz;
                         }
@@ -251,7 +252,7 @@ namespace RouteOpt::Application::CVRP {
                         solver_val[nz] = rhs[k];
                         ++nz;
                         if (it.col() != 0) {
-                            solver_ind[nz] = static_cast<int>(it.col());
+                            solver_ind[nz] = (static_cast<int>(it.col()) == 0) ? 0 : static_cast<int>(it.col()) + 2;
                             solver_val[nz] = it.value();
                             ++nz;
                         }
@@ -261,7 +262,7 @@ namespace RouteOpt::Application::CVRP {
                 ++it;
 
                 for (; it; ++it) {
-                    solver_ind[nz] = static_cast<int>(it.col());
+                    solver_ind[nz] = (static_cast<int>(it.col()) == 0) ? 0 : static_cast<int>(it.col()) + 2;
                     solver_val[nz] = it.value();
                     ++nz;
                 }
@@ -283,6 +284,16 @@ namespace RouteOpt::Application::CVRP {
                 nullptr
             ))
             SAFE_SOLVER(solver.updateModel())
+
+            // print the added constraints
+            // for (int i = 0; i < mat.rows(); ++i) {
+            //     std::cout << "constraint " << i << ": ";
+            //     for (int j = solver_beg[i]; j < solver_beg[i + 1]; ++j) {
+            //         std::cout << "(" << solver_ind[j] << ", " << solver_val[j] << ") ";
+            //     }
+            //     std::cout << "rhs: " << rhs[i] << ", sense: " << sense[i] << std::endl;
+            // }
+
         }
 
         inline void callRCC(
@@ -308,11 +319,13 @@ namespace RouteOpt::Application::CVRP {
 
             if (new_rccs.empty()) return;
             printHeadLines("Separate RCCs");
+            // std::cout << "size of new_rccs = " << new_rccs.size() << std::endl;
 
             sparseRowMatrixXd mat;
             RCCs::CoefficientGetter::RCCCoefficientController::getCoefficientRCC(
                 cols, new_rccs, if_elementary, mat);
-
+            // std::cout << "After getCoefficientRCC, mat.rows() = " << mat.rows()
+            //           << ", mat.cols() = " << mat.cols() << std::endl;
 
             std::vector<char> sense(mat.rows(), SOLVER_LESS_EQUAL);
             if (if_elementary) std::fill(sense.begin(), sense.end(), SOLVER_GREATER_EQUAL);
@@ -321,6 +334,7 @@ namespace RouteOpt::Application::CVRP {
             for (int i = 0; i < new_rccs.size(); ++i) {
                 auto &rcc = new_rccs[i];
                 rcc.idx_rcc = num_row;
+                // std::cout << "" << "rcc.idx_rcc = " << rcc.idx_rcc << std::endl;
                 ++num_row;
                 if (if_keep_rcc) rcc.if_keep = true;
                 rhs[i] = rcc.rhs;
@@ -384,9 +398,107 @@ namespace RouteOpt::Application::CVRP {
 
             addCstr(mat, sense, rhs, solver);
         }
+
+
+
+        inline void callFRC(
+            int dim,
+            const std::vector<double> &x,
+            Solver &solver
+        ) {
+
+            if (!global_config.ALL_EDGES_IF_ONE) return;
+            printHeadLines("Separate FRCs");
+
+            std::vector<int> cbeg;
+            std::vector<int> cind;
+            std::vector<double> cval;
+            int numnzP;
+            SAFE_SOLVER(solver.getConstraints(&numnzP, nullptr, nullptr, nullptr, dim, 1))
+            cbeg.resize(numnzP+1);
+            cind.resize(numnzP);
+            cval.resize(numnzP);
+            SAFE_SOLVER(solver.getConstraints(&numnzP, cbeg.data(), cind.data(), cval.data(), dim, 1))
+
+            std::vector<double> cost;
+            for (int i = 1; i < x.size(); ++i) {
+                if (x[i] > SOL_X_TOLERANCE) {
+                    cost.emplace_back(cval[i]);
+                }
+            }
+            // print cost
+            if (cost.empty()) {
+                PRINT_REMIND("no cost found, return");
+                return;
+            }
+            std::cout << "cost size = " << cost.size() << std::endl;
+            std::cout << "cost = ";
+            for (const auto &c: cost) {
+                std::cout << c << " ";
+            }
+            std::cout << std::endl;
+
+            // if cost is empty, return
+
+            // find the max cost
+            double max_cost = *std::max_element(cost.begin(), cost.end());
+            double min_cost = *std::min_element(cost.begin(), cost.end());
+            std::cout << "max cost = " << max_cost << ", min cost = " << min_cost << std::endl;
+
+            std::vector<double> value(4);
+            value[0] = max_cost;
+            value[1] = max_cost;
+            value[2] = min_cost;
+            value[3] = min_cost;
+
+            // change rhs
+            SAFE_SOLVER(solver.setRhs(3*dim, 4, value.data()))
+
+            // std::vector<char> sense(2);
+            // sense[0] = SOLVER_GREATER_EQUAL;
+            // sense[1] = SOLVER_LESS_EQUAL;
+            // std::vector<double> rhs(2);
+            // rhs[0] = max_cost;
+            // rhs[1] = min_cost;
+
+            // size_t nz = 2;
+            // std::vector<size_t> solver_beg(nz + 1);
+            // solver_beg[0] = 0;
+            // solver_beg[1] = 1;
+            // solver_beg[2] = nz;
+            // std::vector<int> solver_ind(2);
+            // std::vector<double> solver_val(2);
+            // solver_ind[0] = 1; // the first column is the constant term
+            // solver_ind[1] = 2; // the first column is the constant term
+            // solver_val[0] = 1;
+            // solver_val[1] = 1; // the second column is the variable
+
+
+            // SAFE_SOLVER(solver.XaddConstraints(
+            //     2,
+            //     nz,
+            //     solver_beg.data(),
+            //     solver_ind.data(),
+            //     solver_val.data(),
+            //     sense.data(),
+            //     rhs.data(),
+            //     nullptr
+            // ))
+            SAFE_SOLVER(solver.updateModel())
+
+        }
     }
 
+
+
+
+        
+
+
     void CVRPSolver::callCutting(BbNode *node) {
+
+        if (!global_config.ALL_EDGES_IF_ONE) return;
+        // return;
         if (!node->getIfRootNode() && (ml_type == ML_TYPE::ML_GET_DATA_1 || ml_type ==
                                        ML_TYPE::ML_GET_DATA_2)) {
             return;
@@ -401,6 +513,7 @@ namespace RouteOpt::Application::CVRP {
 
         CuttingDetail::trySetInitialIfNodeMemory(node->getR1Cs());
         std::vector<double> x;
+        std::vector<double> x0;
         std::vector<double> sol_x;
         std::vector<SequenceInfo> sols;
         int num_row;
@@ -430,11 +543,29 @@ namespace RouteOpt::Application::CVRP {
         old_val = node->getValue();
 
         x.resize(cols.size());
-        SAFE_SOLVER(node->refSolver().getX(0, cols.size(), x.data()))
+        // SAFE_SOLVER(node->refSolver().getX(0, cols.size(), x.data()))
+        SAFE_SOLVER(node->refSolver().getX(2, cols.size(), x.data()))
+        
+        x0.reserve(1);
+        SAFE_SOLVER(node->refSolver().getX(0, 1, x0.data()))
+        x[0] = x0[0];
         CuttingDetail::getSols(x, cols, sol_x, sols);
 
         SAFE_SOLVER(node->refSolver().getNumRow(&num_row))
         old_row = num_row;
+
+
+        if (global_config.ALL_EDGES_IF_ONE) {
+            std::cout << "ALL_EDGES_IF_ONE is set to true." << std::endl;
+
+            CuttingDetail::callFRC(
+                dim,
+                x,
+                node->refSolver()
+            );
+            
+            goto QUIT;
+        }
 
         CuttingDetail::configureCutsOptions(
             node->getIfInEnumState(),
@@ -457,6 +588,7 @@ namespace RouteOpt::Application::CVRP {
             rollback_brcs = node->getBrCs();
         }
 
+        // std::cout << "before call RCC " << std::endl;
         CuttingDetail::callRCC(
             dim,
             cap,
@@ -470,7 +602,7 @@ namespace RouteOpt::Application::CVRP {
             node->refRCCs(),
             node->refSolver()
         );
-
+        // std::cout << "after call RCC " << std::endl;
 
         if (!CuttingDetail::if_pure_rcc_tail) goto PRICING;
 
@@ -495,6 +627,7 @@ namespace RouteOpt::Application::CVRP {
         }
     PRICING:
         if (old_row == num_row) {
+            // std::cout << "old_row == num_row, no cuts are added!" << std::endl;
             goto SET_TAIL_OFF;
         }
         //
@@ -522,7 +655,9 @@ namespace RouteOpt::Application::CVRP {
 
     ENTER:
         old_enu_state = node->getIfInEnumState();
+        std::cout << "before call pricing" << std::endl;
         callPricing(node, time_limit, eps);
+        std::cout << "after call pricing" << std::endl;
         if (node->getIfTerminate()) goto QUIT;
         if (!node->getIfInEnumState()) {
             if (!pricing_controller.getIfCompleteCG()) {
@@ -561,10 +696,17 @@ namespace RouteOpt::Application::CVRP {
         //
         if (!node->getIfTerminate()) {
             SAFE_SOLVER(node->refSolver().reoptimize())
-            x.resize(cols.size());
-            SAFE_SOLVER(node->refSolver().getX(0, cols.size(), x.data()))
+            x.resize(cols.size()+2);
+            SAFE_SOLVER(node->refSolver().getX(0, cols.size()+2, x.data()))
+            // SAFE_SOLVER(node->refSolver().getX(2, cols.size(), x.data()))
+            // x0.resize(1);
+            // SAFE_SOLVER(node->refSolver().getX(0, 1, x0.data()))
+            // x[0] = x0[0];
+
+
             double obj;
             SAFE_SOLVER(node->refSolver().getObjVal(&obj))
+            std::cout << "obj = " << obj << std::endl;
             bool if_integer, if_feasible;
             updateIntegerSolution(obj, x, cols, if_integer, if_feasible);
             if (if_integer && if_feasible) {

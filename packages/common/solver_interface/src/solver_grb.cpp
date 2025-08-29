@@ -54,6 +54,8 @@ namespace RouteOpt {
             if (error) return error;
         }
         error = GRBoptimize(model);
+        // write the model
+        // error = GRBwrite(model, "reoptimize_model.lp");
         if (error) return error;
         if (now_method != method) {
             error = setEnvMethod(now_method);
@@ -64,6 +66,7 @@ namespace RouteOpt {
 
     int Solver::optimize() {
         auto error = GRBoptimize(model);
+        // error = GRBwrite(model, "optimize_model.lp");
         return error;
     }
 

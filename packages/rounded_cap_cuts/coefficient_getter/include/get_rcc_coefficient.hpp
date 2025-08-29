@@ -81,6 +81,7 @@ namespace RouteOpt::RCCs::CoefficientGetter {
             }
             mat.setFromTriplets(triplets.begin(), triplets.end());
         } else {
+            // std::cout << "if_elementary = false " << std::endl;
             std::unordered_map<std::pair<int, int>, std::vector<std::pair<int, int> >, PairHasher> map_idx;
             CoefficientGetterDetail::getMap(seq_info, map_idx);
             std::vector<double> sup(seq_info.size());
@@ -89,6 +90,12 @@ namespace RouteOpt::RCCs::CoefficientGetter {
                 std::fill_n(sup.begin(), seq_info.size(), 0);
                 if (rcc.form_rcc == static_cast<int>(RCCForm::RCC_FORM_1)) {
                     auto &customer_info = rcc.info_rcc_customer;
+                    // print all customer info
+                    // std::cout << "RCCForm::RCC_FORM_1" << std::endl;
+                    // for (auto &cus: customer_info) {
+                    //     std::cout << cus << " ";
+                    // }
+                    // std::cout << std::endl;
                     for (auto i = customer_info.begin(); i != customer_info.end(); ++i) {
                         auto j = i;
                         ++j;
@@ -102,6 +109,18 @@ namespace RouteOpt::RCCs::CoefficientGetter {
                 } else if (rcc.form_rcc == static_cast<int>(RCCForm::RCC_FORM_2)) {
                     auto &customer_info = rcc.info_rcc_customer;
                     auto &outside_customer_info = rcc.info_rcc_outside_customer;
+                    // print all customer info
+                    // std::cout << "RCCForm::RCC_FORM_2" << std::endl;
+                    // std::cout <<  "rcc.info_rcc_customer" << std::endl;
+                    // for (auto &cus: customer_info) {
+                    //     std::cout << cus << " ";
+                    // }
+                    // std::cout << std::endl;
+                    // std::cout <<  "rcc.info_rcc_outside_customer" << std::endl;
+                    // for (auto &cus: outside_customer_info) {
+                    //     std::cout << cus << " ";
+                    // }
+                    // std::cout << std::endl;
                     for (auto i = outside_customer_info.begin(); i != outside_customer_info.end(); ++i) {
                         auto j = i;
                         ++j;
@@ -128,8 +147,16 @@ namespace RouteOpt::RCCs::CoefficientGetter {
 
                 for (int i = 0; i < seq_info.size(); ++i) {
                     if (equalFloat(sup[i], 0)) continue;
+                    // if (!i){
                     triplets.emplace_back(idx, i, sup[i]);
+                    // std::cout << "triplet: (" << idx << ", " << i << ", " << sup[i] << ")" << std::endl;
+                    // }
+                    // else{
+                    //     triplets.emplace_back(idx, i+2, sup[i]);
+                    //     std::cout << "triplet: (" << idx << ", " << i+2 << ", " << sup[i] << ")" << std::endl;
+                    // }
                 }
+                
             }
             mat.setFromTriplets(triplets.begin(), triplets.end());
         }

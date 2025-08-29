@@ -9,6 +9,10 @@
 #include "add_column_controller.hpp"
 #include "rcc_coefficient_controller.hpp"
 #include "node_macro.hpp"
+#include "global_config.hpp"
+
+#include <fstream>
+#include <iostream>
 
 namespace RouteOpt::Application::CVRP {
     namespace AddColumnDetail {
@@ -75,14 +79,16 @@ namespace RouteOpt::Application::CVRP {
         double cost_sum;
 
         int ccnt = static_cast<int>(new_cols_ref.get().size());
+        // std::cout << "ccnt= " << ccnt << std::endl;
         edge_map.clear();
         edge_map.reserve(dim * dim);
         mat.resize(num_row, ccnt);
+        // std::cout << "mat rows= " << num_row << std::endl;
         mat.setZero();
         cost.resize(ccnt);
 
         std::unordered_map<std::pair<int, int>, double, PairHasher> coeff_map;
-        coeff_map.reserve(dim * dim);
+        coeff_map.reserve(dim * dim); 
 
         std::unordered_map<int, int> single_size_route; //customer, col idx
 
@@ -92,7 +98,9 @@ namespace RouteOpt::Application::CVRP {
             if (col.size() == 1) single_size_route[col[0]] = ccnt_cnt;
             past_node = 0;
             cost_sum = 0;
+            // std::cout << "col " << ccnt_cnt << ": ";
             for (int curr_node: col) {
+                // std::cout << curr_node << " ";
                 cost_sum += cost_mat4_vertex_ref.get()[past_node][curr_node];
                 ++coeff_map[{curr_node - 1, ccnt_cnt}];
                 auto pr = past_node < curr_node
@@ -101,39 +109,87 @@ namespace RouteOpt::Application::CVRP {
                 edge_map[pr].emplace_back(ccnt_cnt);
                 past_node = curr_node;
             }
+            // std::cout << " ";
             edge_map[std::make_pair(0, past_node)].emplace_back(ccnt_cnt);
             cost_sum += cost_mat4_vertex_ref.get()[past_node][0];
             cost(ccnt_cnt) = cost_sum;
+            // std::cout << ", cost= " << cost_sum << std::endl;
+            // print coeff_map
+            // std::cout << "coeff_map for col " << ccnt_cnt << ": ";
+            // for (auto &it: coeff_map) {
+            //     std::cout << "{" << it.first.first << ", " << it.first.second << "}:" << it.second << std::endl;
+            // }
             ++ccnt_cnt;
         }
 
+        // std::cout << "ccnt_cnt= " << ccnt_cnt << std::endl;
 
+        
         sparseColMatrixXd mat_rcc;
         RCCs::CoefficientGetter::RCCCoefficientController::getCoefficientRCC(
             new_cols_ref.get(), *rccs_ptr, if_enu, mat_rcc);
-
+        
+        ccnt_cnt = 0;
         for (auto &br: *brcs_ptr) {
             int idx = br.idx_brc;
+            // std::cout << "brc idx= " << idx << ", edge= " << br.edge.first << "-" << br.edge.second
+            //           << ", range= " << br.range.first << "-" << br.range.second
+            //           << ", last_customer_idx= " << br.last_customer_idx
+            //           << ", br_dir= " << br.br_dir
+            //           << std::endl;
             if (idx == INVALID_BRC_INDEX) continue;
             int ai = br.edge.first;
             int aj = br.edge.second;
-            auto pr = ai < aj ? std::make_pair(ai, aj) : std::make_pair(aj, ai);
-            for (auto it_map: edge_map[pr]) ++coeff_map[{idx, it_map}];
-            if (ai == 0 && single_size_route.find(aj) != single_size_route.end()) {
-                coeff_map[{idx, single_size_route[aj]}] = 1; //force to be 1
+            if (ai == dim && aj == dim) {
+                // for all columns
+                for (int i = 0; i < ccnt; ++i) {
+                    if ((br.range.first == 1) && (cost(i) - br.range.second >= TOLERANCE)) { // m
+                        // std::cout << "col " << i << " cost= " << cost(i) << " br.range.second= " << br.range.second << std::endl;
+                        coeff_map[{idx, i}] = 1; //force to be 1
+                    }
+                    if ((br.range.first == 2) && (cost(i) - br.range.second <= TOLERANCE)) { // n
+                        // std::cout << "col " << i << " cost= " << cost(i) << " br.range.second= " << br.range.second << std::endl;
+                        coeff_map[{idx, i}] = 1; //force to be 1
+                    }
+                    if (br.last_customer_idx == new_cols_ref.get()[i].col_seq.back()) {
+                        coeff_map[{idx, i}] = 1; //force to be 1    
+                    }
+                }
             }
+            else {
+                auto pr = ai < aj ? std::make_pair(ai, aj) : std::make_pair(aj, ai);
+                for (auto it_map: edge_map[pr]) {
+                    // std::cout << "brc idx= " << idx << ", edge= " << pr.first << "-" << pr.second
+                    //           << ", it_map= " << it_map << std::endl;
+                    ++coeff_map[{idx, it_map}];
+                }
+                if (ai == 0 && single_size_route.find(aj) != single_size_route.end()) {
+                    coeff_map[{idx, single_size_route[aj]}] = 1; //force to be 1
+                }
+            }
+            
         }
 
         sparseColMatrixXd mat_r1c;
         rank1_coefficient_getter_ref.get().getR1CCoeffs(new_cols_ref.get(), *r1cs_ptr, nullptr, !if_enu, mat_r1c);
 
-        size_t n = mat_rcc.nonZeros() + coeff_map.size() + mat_r1c.nonZeros() + ccnt;
+        size_t n = mat_rcc.nonZeros() + coeff_map.size() + mat_r1c.nonZeros() + 4 * ccnt;
+        // std::cout << "n= " << n << std::endl;
         std::vector<Eigen::Triplet<double> > triplet(n);
         n = 0;
 
         for (auto &it: coeff_map) {
             triplet[n++] = {it.first.first, it.first.second, it.second};
         }
+
+        // print triplet
+        // std::cout << "print triplet before adding r1c and rcc" << std::endl;
+
+        // for (int i = 0; i < n; ++i) {
+        //     std::cout << triplet[i].row() << " " << triplet[i].col() << " " << triplet[i].value() << std::endl;
+        // }
+        // exit(0);
+
 
         std::vector<int> lp_r1c_map(r1cs_ptr->size()), lp_rcc_map(rccs_ptr->size());
         std::transform(r1cs_ptr->begin(), r1cs_ptr->end(), lp_r1c_map.begin(),
@@ -147,6 +203,7 @@ namespace RouteOpt::Application::CVRP {
             }
             for (sparseColMatrixXd::InnerIterator it(mat_rcc, i); it; ++it) {
                 triplet[n++] = {lp_rcc_map[it.row()], static_cast<int>(it.col()), it.value()};
+                // std::cout << "lp_rcc_map triplet: (" << lp_rcc_map[it.row()] << ", " << it.col() << ", " << it.value() << ")" << std::endl;
             }
         }
 
@@ -155,6 +212,33 @@ namespace RouteOpt::Application::CVRP {
         for (int i = 0; i < ccnt; ++i) {
             triplet[n++] = {real_dim, i, 1};
         }
+
+        // budget_constraint_call()
+        auto budget_idx = dim;
+        for (int i = 0; i < ccnt; ++i) {
+            triplet[n++] = {budget_idx, i, cost(i)};
+        }
+
+        // <= m
+        int idx = 0;
+        for (auto &c: new_cols_ref.get()) {
+            auto &col = c.col_seq;
+            // find the last node in the column
+            auto last_node = col.back();
+            triplet[n++] = {budget_idx + last_node, idx, cost(idx)}; // last node - 1 is the index in the matrix
+            triplet[n++] = {2 * budget_idx - 1 + last_node, idx, cost(idx)-global_config.BIG_M}; // last node - 1 is the index in the matrix
+            ++idx;
+        }
+
+        // std::cout << "print after coeff_map" << std::endl;
+        // for (int i = coeff_map.size(); i < n; ++i) {
+        //     std::cout << triplet[i].row() << " " << triplet[i].col() << " " << triplet[i].value() << std::endl;
+        // }
+        // exit(0);
+
+
+        // std::cout << "triplet size= " << n << std::endl;
+
         triplet.resize(n);
 
         SAFE_EIGEN(mat.setFromTriplets(triplet.begin(), triplet.end());)
@@ -167,6 +251,12 @@ namespace RouteOpt::Application::CVRP {
         SAFE_SOLVER(solver_ptr->updateModel())
         SAFE_SOLVER(solver_ptr->getNumRow(&num_row))
 
+        // std::cout << "num_row= " << num_row << std::endl;
+        // print pi4_labeling
+        // for (int i = 0; i < num_row; ++i) {
+        //     std::cout << pi4_labeling[i] << std::endl;
+        // }
+
         sparseColMatrixXd mat;
         Eigen::RowVectorXd cost;
         std::unordered_map<std::pair<int, int>, std::vector<int>, PairHasher> edge_map;
@@ -178,7 +268,60 @@ namespace RouteOpt::Application::CVRP {
             RowVectorXd local_pi(num_row);
             std::transform(pi4_labeling.begin(), pi4_labeling.end(), local_pi.data(),
                            [](double pi) { return pi; });
-            SAFE_EIGEN(rc = cost - local_pi * mat)
+            SAFE_EIGEN(rc = - local_pi * mat)
+
+            // print rc
+            // std::cout << "rc: " << std::endl;
+            // for (int i = 0; i < ccnt; ++i) {
+            //     std::cout << rc(i) << std::endl;
+            // }
+
+            // std::cout << "local_pi: " << std::endl;
+            // for (int i = 0; i < num_row; ++i) {
+            //     std::cout << local_pi(i) << std::endl;
+            // }
+            // exit(0);
+
+            // std::cout << "mat: " << std::endl;
+            // for (int i = 0; i < num_row; ++i) {
+            //     for (int j = 0; j < ccnt; ++j) {
+            //         std::cout << mat.coeff(i, j) << " ";
+            //     }
+            //     std::cout << std::endl;
+            // }
+
+
+            
+
+            // print mat
+            // std::string filename = "mat.txt";
+            // std::ofstream fout(filename);
+            // if (!fout.is_open()) {
+            //     std::cerr << "Failed to open file: " << filename << std::endl;
+            //     return;
+            // }
+
+            // int rows = mat.rows();
+            // int cols = mat.cols();
+
+            // for (int i = 0; i < rows; ++i) {
+            //     for (int j = 0; j < cols; ++j) {
+            //         fout << mat.coeff(i, j) << " ";
+            //     }
+            //     fout << "\n";
+            // }
+
+            // fout.close();
+            // std::cout << "Matrix written to: " << filename << std::endl;
+
+            // print local_pi
+            // std::cout << "local_pi: ";
+            // for (int i = 0; i < num_row; ++i) {
+            //     std::cout << local_pi(i) << std::endl;
+            // }
+            // std::cout << std::endl;
+
+            // exit(0);
             if constexpr (CHECK_RC_EVERY_COLUMN) {
                 PRINT_DEBUG("check RC for every column");
                 AddColumnDetail::checkRC(*r1cs_ptr, negative_rc_label_tuple_ref.get(), new_cols_ref.get(), rc, local_pi,
@@ -197,7 +340,7 @@ namespace RouteOpt::Application::CVRP {
         for (int i = 0; i < ccnt; ++i) {
             if (rc(i) < RC_TOLERANCE) {
                 solver_beg[ccnt_cnt] = nzcnt;
-                solver_obj[ccnt_cnt] = cost(i);
+                solver_obj[ccnt_cnt] = 0.0;
                 ++ccnt_cnt;
                 for (sparseColMatrixXd::InnerIterator it(mat, i); it; ++it) {
                     solver_ind[nzcnt] = static_cast<int>(it.row());
@@ -208,7 +351,7 @@ namespace RouteOpt::Application::CVRP {
                 auto &col = new_cols_ref.get()[i];
                 for (auto j: col.col_seq) std::cout << j << " ";
                 std::cout << " | " << col.forward_concatenate_pos << std::endl;
-                std::cout << "col " << i << " is not allowed! The rc= " << rc(i) << std::endl;
+                std::cout << "col " << i << " is not allowed! The rc= " << rc(i) << ", The cost = " << cost(i) << std::endl;
                 THROW_RUNTIME_ERROR("wrong pricing column");
             }
             if constexpr (CHECK_PRICING_LABELS) {
@@ -230,6 +373,25 @@ namespace RouteOpt::Application::CVRP {
 
         ccnt = ccnt_cnt;
         if (!ccnt) return;
+
+
+        double lb_m;
+        double ub_m;
+        double lb_n;
+        double ub_n;
+        SAFE_SOLVER(solver_ptr->getColUpper(1,&ub_m))
+        SAFE_SOLVER(solver_ptr->getColLower(1,&lb_m))
+
+        SAFE_SOLVER(solver_ptr->getColUpper(2,&ub_n))
+        SAFE_SOLVER(solver_ptr->getColLower(2,&lb_n))
+
+        // std::vector<double> solver_ub(ccnt, 1.0);
+        // for (int i = 0; i < ccnt; ++i) {
+        //     if (cost(i) < lb_n)
+        //         solver_ub[i] = 0.0;
+        //     // if (cost(i) > ub_m)
+        //     //     solver_ub[i] = 0.0;
+        // }
 
         SAFE_SOLVER(solver_ptr->XaddVars(ccnt_cnt,
             nzcnt,

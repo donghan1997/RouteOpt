@@ -76,6 +76,8 @@ namespace RouteOpt::Application::CVRP {
     inline void cleanNegativeTuple(std::vector<std::tuple<Label *, Label *, double> > &negative_rc_label_tuple,
                                    int num) {
         if (negative_rc_label_tuple.empty()) return;
+        // print the size of negative_rc_label_tuple
+        // std::cout << "negative_rc_label_tuple size: " << negative_rc_label_tuple.size() << std::endl;
         std::sort(negative_rc_label_tuple.begin(), negative_rc_label_tuple.end(),
                   [](const std::tuple<Label *, Label *, double> &a, const std::tuple<Label *, Label *, double> &b) {
                       return std::get<2>(a) < std::get<2>(b);
@@ -129,6 +131,13 @@ namespace RouteOpt::Application::CVRP {
                 }
             }
             if constexpr (CHECK_PRICING_LABELS)seq_rc[col] = std::get<2>(i);
+
+            // print column
+            // for (auto j: col) {
+            //     std::cout << j << " ";
+            // }
+            // std::cout << " | rc= " << std::get<2>(i) << std::endl;
+
 
             ++col_idx;
         }

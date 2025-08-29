@@ -40,10 +40,17 @@ int main(int argc, char *argv[]) {
     CandidateSelectionFuncType ml_candidate_selection = nullptr;
     // If machine learning is enabled (ml_type is not ML_NO_USE), set the candidate selection function.
     if constexpr (ml_type != ML_TYPE::ML_NO_USE) {
+        std::cout << "Machine learning module is enabled." << std::endl;
         ml_candidate_selection = [cvrp](auto arg1, auto &arg2, auto &arg3, auto &arg4) -> std::pair<int, int> {
             return cvrp->callMLCandidateSelection(arg1, arg2, arg3, arg4);
         };
     }
+
+    //Define a candidate selection function pointer for range-based candidate selection.
+    
+
+
+
 
     // Define an output function pointer for writing nodes.
     OutNodeFuncType node_out_func = nullptr;

@@ -15,7 +15,7 @@ namespace RouteOpt::Application::CVRP {
         //print all brcs
         for (auto &brc: node->getBrCs()) {
             std::cout << "brc= " << brc.edge.first << "-" << brc.edge.second << " : " << (brc.br_dir ? "+" : "-")
-                    << std::endl;
+                    << ", range=(" << brc.range.first << "," << brc.range.second  << ") ,  customer_idx= " << brc.last_customer_idx << std::endl;
         }
 
         if constexpr (IF_WRITE_NODE_OUT) TwoStageController::updateUB(ins_name, ub);

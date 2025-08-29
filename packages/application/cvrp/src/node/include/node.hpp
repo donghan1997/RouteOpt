@@ -27,8 +27,8 @@ namespace RouteOpt::Application::CVRP {
             if (a->if_in_enu_state != b->if_in_enu_state)
                 return a->if_in_enu_state > b->if_in_enu_state;
 
-            if (!equalFloat(a->value, b->value))
-                return a->value < b->value;
+            // if (!equalFloat(a->value, b->value))
+            //     return a->value > b->value;
 
             return a->idx < b->idx;
         }
@@ -62,6 +62,57 @@ namespace RouteOpt::Application::CVRP {
 
         static void setDim(int dim) {
             BbNode::dim = dim;
+        }
+
+        inline int getDim() const { return dim; }
+
+
+        void setBigU(double bigU) {
+            big_U = bigU;
+        }
+
+        void setBigL(double bigL) {
+            big_L = bigL;
+        }
+
+        double getBigU() {
+            return big_U;
+        }
+
+        double getBigL() {
+            return big_L;
+        }
+
+        void setBranchOnM(bool branch) {
+            branch_on_m = branch;
+        }
+
+        void setBranchOnN(bool branch) {
+            branch_on_n = branch;
+        }
+
+        bool getBranchOnM() {
+            return branch_on_m;
+        }
+
+        bool getBranchOnN() {
+            return branch_on_n;
+        }
+
+        void setBranchOnCustomer(bool branch) {
+            branch_on_customer = branch;
+        }
+
+        bool getBranchOnCustomer() {
+            return branch_on_customer;
+        }
+
+        void setBranchCustomerIdx(int idx) {
+            branch_customer_idx = idx;
+        }
+
+        int getBranchCustomerIdx() {
+            return branch_customer_idx;
         }
 
         //user defined functions end
@@ -330,6 +381,10 @@ namespace RouteOpt::Application::CVRP {
                int num_buckets_per_vertex,
                const Brc &bf);
 
+        // BbNode(BbNode *node,
+        //     bool if_symmetry,
+        //     int num_buckets_per_vertex);
+
         BbNode(BbNode *node, const Brc &bf);
 
         void rmColByBranchInEnuMatrix(
@@ -354,6 +409,13 @@ namespace RouteOpt::Application::CVRP {
         static int dim;
         static int node_idx_counter;
         static sparseRowMatrixXd row_basic_matrix;
+
+        double big_L; // Lower bound for branching.
+        double big_U;
+        bool branch_on_m; // Flag to indicate if branching on m is allowed.
+        bool branch_on_n;
+        bool branch_on_customer{false};
+        int branch_customer_idx{-1}; // Index of the customer to branch on, if applicable.
 
         double last_gap{1.};
         double br_value_improved{};

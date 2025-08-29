@@ -264,6 +264,8 @@ namespace RouteOpt::Application::CVRP {
                               const std::vector<R1c> &r1cs,
                               const std::vector<Brc> &brcs,
                               const std::vector<double> &pi_vector);
+        
+        void updateBigL_U(const std::vector<double> &cval, const std::vector<double> &X, const int &num_col);
 
         template<bool if_symmetry>
         void considerRegenerateBucketGraph(
@@ -332,6 +334,14 @@ namespace RouteOpt::Application::CVRP {
         int *copy_col_pool4_pricing{}; //used in heuristic std::find ub!
         size_t pool_beg4_pricing{};
         std::vector<std::vector<double> > chg_cost_mat4_vertex{};
+        std::unordered_map<int, std::vector<std::vector<double> >> chg_cost_mats_by_last_customer{}; ///////fainess
+        std::vector<double> dual_vector{}; //////fairness dual value
+        double beta_max{}; // beta = P_M + P_N;
+        double beta_min{};
+        double theta_max{}; // theta = max(bigU, bigL) for range branching
+        std::vector<Brc> brcs_from_node;
+        double big_L{};
+        double big_U{};
         std::unordered_map<int, double> adjust_brc_dual4_single_route{}; //customer, dual
         std::vector<std::vector<Resource> > resource_across_arcs_in_forward_sense{};
         std::vector<std::vector<Resource> > resource_across_arcs_in_backward_sense{};
@@ -560,6 +570,8 @@ namespace RouteOpt::Application::CVRP {
 
         void pricePartitioning(const std::vector<double> &pi_vector);
 
+        void pricePartitioningByCustomers(const std::vector<Brc> &Brcs, const std::vector<double> &pi_vector);
+
         void priceBRC(const std::vector<Brc> &Brcs, const std::vector<double> &pi_vector);
 
         int checkPricingPool() const;
@@ -593,6 +605,8 @@ namespace RouteOpt::Application::CVRP {
 
         template<bool dir>
         bool doRCTermDominance(Label *ki, Label *kj);
+
+        // bool doCostTermDominance(Label *ki, Label *kj);
 
 
         template<bool dir, PRICING_LEVEL pricing_level>

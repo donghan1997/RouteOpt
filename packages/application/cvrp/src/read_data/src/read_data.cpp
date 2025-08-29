@@ -12,6 +12,7 @@
 #include "read_data_controller.hpp"
 #include "read_data_macro.hpp"
 #include "route_opt_macro.hpp"
+#include "global_config.hpp"
 
 namespace RouteOpt::Application::CVRP {
     void CVRP_ReadDataController::generateInstancePath(int argc, char *argv[]) {
@@ -33,6 +34,11 @@ namespace RouteOpt::Application::CVRP {
                 std::stringstream convert(argv[++i]);
                 if (!(convert >> ub_ref.get())) {
                     printf("Invalid number: %s\n", argv[i]);
+                }
+                else {
+                    global_config.BIG_M = ub_ref.get();
+                    global_config.Budget = ub_ref.get();
+                    std::cout << "Set BIG_M and Budget to: " << global_config.BIG_M << std::endl;
                 }
             } else if (arg == "-b" && i + 1 < argc) {
                 std::stringstream convert(argv[++i]);
@@ -297,6 +303,7 @@ namespace RouteOpt::Application::CVRP {
             temp_ss >> info_vertex[tmp_j][3];
             ++tmp_j;
         }
+        // dim_ref.get() = 11;
         info_vertex.resize(dim_ref.get());
     }
 }

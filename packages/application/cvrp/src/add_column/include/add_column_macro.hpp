@@ -9,6 +9,6 @@
 #define ROUTE_OPT_ADD_COLUMN_MACRO_HPP
 
 namespace RouteOpt::Application::CVRP {
-    constexpr bool CHECK_RC_EVERY_COLUMN{false};
+    constexpr bool CHECK_RC_EVERY_COLUMN{true};
 }
 #endif // ROUTE_OPT_ADD_COLUMN_MACRO_HPP

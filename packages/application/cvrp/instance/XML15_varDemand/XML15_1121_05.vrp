@@ -1,0 +1,44 @@
+NAME : XML15_1121_05
+COMMENT : Generated as the XML100 dataset from the CVRPLIB
+TYPE : CVRP
+DIMENSION : 16
+EDGE_WEIGHT_TYPE : EUC_2D
+CAPACITY : 18
+NODE_COORD_SECTION
+1    367  814 
+2    889  252 
+3    380  480 
+4    860  476 
+5    861  757 
+6    255  13  
+7    542  29  
+8    748  221 
+9    389  556 
+10   667  944 
+11   707  965 
+12   255  664 
+13   160  115 
+14   104  587 
+15   53   922 
+16   794  965 
+DEMAND_SECTION
+1    0   
+2    7   
+3    8   
+4    2   
+5    2   
+6    5   
+7    10  
+8    5   
+9    10  
+10   9   
+11   2   
+12   8   
+13   1   
+14   2   
+15   4   
+16   1   
+DEPOT_SECTION
+1
+-1
+EOF
