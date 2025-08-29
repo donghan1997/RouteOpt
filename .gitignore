@@ -9,6 +9,7 @@ Thumbs.db
 *.swp
 
 # ---- Build artifacts ----
+instance/
 build/
 bin/
 lib/
