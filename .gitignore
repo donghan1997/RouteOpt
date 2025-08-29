@@ -45,3 +45,6 @@ Makefile
 # ---- Python cache (in case you use Python scripts) ----
 __pycache__/
 *.pyc
+
+*.vrp
+*.sol
