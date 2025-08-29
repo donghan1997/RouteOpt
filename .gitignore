@@ -9,7 +9,7 @@ Thumbs.db
 *.swp
 
 # ---- Build artifacts ----
-instance/
+packages/application/cvrp/instance/
 build/
 bin/
 lib/
