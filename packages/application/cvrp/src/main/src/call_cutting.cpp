@@ -497,7 +497,7 @@ namespace RouteOpt::Application::CVRP {
 
     void CVRPSolver::callCutting(BbNode *node) {
 
-        if (!global_config.ALL_EDGES_IF_ONE) return;
+        // if (!global_config.ALL_EDGES_IF_ONE) return;
         // return;
         if (!node->getIfRootNode() && (ml_type == ML_TYPE::ML_GET_DATA_1 || ml_type ==
                                        ML_TYPE::ML_GET_DATA_2)) {

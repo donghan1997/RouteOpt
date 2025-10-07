@@ -100,6 +100,8 @@ namespace RouteOpt::Application::CVRP {
 
         void processLPTesting(BbNode *node, const std::pair<int, int> &edge, double &dif1, double &dif2);
 
+        // void processLPRangeTesting(BbNode *node, double &dif1, double &dif2);
+
         template<bool if_exact>
         void processCGTesting(BbNode *node, const std::pair<int, int> &edge, double &dif1, double &dif2);
 

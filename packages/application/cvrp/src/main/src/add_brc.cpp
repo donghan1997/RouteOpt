@@ -102,8 +102,8 @@ namespace RouteOpt::Application::CVRP {
             int num_col;
             SAFE_SOLVER(node->refSolver().getNumCol(&num_col))
 
-            std::vector<double> xval(num_col);
-            SAFE_SOLVER(node->refSolver().getX(0, num_col, xval.data()))
+            // std::vector<double> xval(num_col);
+            // SAFE_SOLVER(node->refSolver().getX(0, num_col, xval.data()))
 
             std::vector<int> cbeg;
             std::vector<int> cind;
@@ -158,8 +158,8 @@ namespace RouteOpt::Application::CVRP {
                 bf.br_dir = false;
                 bf.idx_brc = INVALID_BRC_INDEX;
                 node->refBrCs().emplace_back(bf);
-                TestingDetail::addRangeBranchConstraint(3*start-1+1, static_cast<int>(lower_m), node->refSolver());
-                std::cout << "m >= " << static_cast<int>(lower_m) << std::endl;
+                TestingDetail::addRangeBranchConstraint(3*start-1+1, static_cast<int>(upper_m)+1, node->refSolver());
+                std::cout << "m >= " << static_cast<int>(upper_m)+1 << std::endl;
 
             }
             else if (node->getBranchOnN()) {
@@ -187,8 +187,8 @@ namespace RouteOpt::Application::CVRP {
                 node->refBrCs().emplace_back(bf);
                 
                 
-                TestingDetail::addRangeBranchConstraint(3*start+2+1,static_cast<int>(upper_n) , node->refSolver());
-                std::cout << "n <= " << static_cast<int>(upper_n) << std::endl;
+                TestingDetail::addRangeBranchConstraint(3*start+2+1,static_cast<int>(lower_n)-1 , node->refSolver());
+                std::cout << "n <= " << static_cast<int>(lower_n)-1 << std::endl;
                 
             }
             else {

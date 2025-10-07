@@ -27,8 +27,8 @@ namespace RouteOpt::Application::CVRP {
             if (a->if_in_enu_state != b->if_in_enu_state)
                 return a->if_in_enu_state > b->if_in_enu_state;
 
-            // if (!equalFloat(a->value, b->value))
-            //     return a->value > b->value;
+            if (!equalFloat(a->value, b->value))
+                return a->value > b->value;
 
             return a->idx < b->idx;
         }

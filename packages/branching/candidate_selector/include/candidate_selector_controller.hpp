@@ -20,6 +20,7 @@
 #include <unordered_map>
 #include <vector>
 #include <functional>
+#include <random>
 #include "route_opt_macro.hpp"
 #include "candidate_selector_macro.hpp"
 #include "branching_macro.hpp"
@@ -210,26 +211,74 @@ namespace RouteOpt::Branching::CandidateSelector {
                                         BranchingDataShared<BrCType, Hasher> &branching_data_shared,
                                         const std::unordered_map<BrCType, double, Hasher> &candidate_map) {
 
-            static BrCType dummy_default;
-            testing_range_branch(node);
-            if (node->getBranchOnM() || node->getBranchOnN()) {
-                std::cout << "Branching on range: " << (node->getBranchOnM() ? "M" : "N") 
-                    << ", big value: " << (node->getBranchOnM() ? node->getBigU() : node->getBigL()) << std::endl;
-                dummy_default.first = node->getDim();
-                dummy_default.second = node->getDim();
-                return dummy_default;
-            }
+            // static BrCType dummy_default;
+            // testing_range_branch(node);
+            // if (node->getBranchOnM() || node->getBranchOnN()) {
+            //     // std::cout << "Branching on range: " << (node->getBranchOnM() ? "M" : "N") 
+            //     //     << ", big value: " << (node->getBranchOnM() ? node->getBigU() : node->getBigL()) << std::endl;
 
-            // here we are trying to branch on last customer
-            testing_last_customer_branch(node);
-            if (node->getBranchOnCustomer()) {
-                std::cout << "Branching on customer: " << node->getBranchCustomerIdx() << std::endl;
-                dummy_default.first = node->getDim();
-                dummy_default.second = node->getDim();
-                return dummy_default;
-            }
+            //     testing(node, branching_history, branching_data_shared, TestingPhase::LP);
+
+            //     if (node->getBranchOnM() && node->getBranchOnN()) {
+            //         // generate random number to decide which one to branch on
+            //         // static std::random_device rd;
+            //         // static std::mt19937 gen(rd());
+            //         // std::uniform_real_distribution<double> dis(0.0, 1.0);
+            //         // double rnd = dis(gen);
+            //         // if (rnd < 0.5) {
+            //         //     std::cout << "Branching on both M and N, prioritize M branching." << std::endl;
+            //         //     node->setBranchOnN(false); // reset N branching for next iteration
+            //         //     std::cout << "Branching on M with big_U = " << node->getBigU() << std::endl;
+            //         // } else {
+            //         //     std::cout << "Branching on both M and N, prioritize N branching." << std::endl;
+            //         //     node->setBranchOnM(false); // reset N branching for next iteration
+            //         //     std::cout << "Branching on N with big_L = " << node->getBigL() << std::endl;
+            //         // }
+            //         int start = node->getDim();
+            //         std::vector<double> rhs_m_n(4);
+            //         SAFE_SOLVER(node->refSolver().getRhs(3*start-1+1, 4, rhs_m_n.data()))
+            //         double lb_m = rhs_m_n[0];
+            //         double ub_m = rhs_m_n[1];
+            //         double lb_n = rhs_m_n[2];
+            //         double ub_n = rhs_m_n[3];
+
+            //         double range_m = ub_m - lb_m;
+            //         double range_n = ub_n - lb_n;
+
+            //         // prioritize branching on the variable with larger range
+            //         if (range_m >= range_n) {
+            //             std::cout << "Branching on both M and N, prioritize M branching." << std::endl;
+            //             node->setBranchOnN(false); // reset N branching for next iteration
+            //             std::cout << "Branching on M with big_U = " << node->getBigU() << std::endl;
+            //         } else {
+            //             std::cout << "Branching on both M and N, prioritize N branching." << std::endl;
+            //             node->setBranchOnM(false); // reset N branching for next iteration
+            //             std::cout << "Branching on N with big_L = " << node->getBigL() << std::endl;
+            //         }
+
+            //     }
+            //     dummy_default.first = node->getDim();
+            //     dummy_default.second = node->getDim();
+
+            //     return dummy_default;
+            // }
 
             // exit(0);
+
+            // here we are trying to branch on last customer
+            // testing_last_customer_branch(node);
+            // if (node->getBranchOnCustomer()) {
+
+            //     testing(node, branching_history, branching_data_shared, TestingPhase::LP);
+
+            //     if (node->getBranchOnCustomer()) {
+            //         std::cout << "Branching on customer: " << node->getBranchCustomerIdx() << std::endl;
+            //         dummy_default.first = node->getDim();
+            //         dummy_default.second = node->getDim();
+            //         return dummy_default;
+            //     }       
+            // }
+
 
 
             NoEdgeCandidate_LP = false;
@@ -284,7 +333,6 @@ namespace RouteOpt::Branching::CandidateSelector {
             BranchingDataShared<BrCType, Hasher> &branching_data_shared,
             TestingPhase phase);
 
-        
         void testing_range_branch(Node *node) {
             int num_col;
             SAFE_SOLVER(node->refSolver().getNumCol(&num_col))
@@ -352,18 +400,18 @@ namespace RouteOpt::Branching::CandidateSelector {
 
 
             // print customer contribution
-            std::cout << "Customer contribution: " << std::endl;
-            for (int i = 0; i < dim; ++i) {
-                if (customer_x_contribution[i] > TOLERANCE)
-                    std::cout << "Customer " << i << ": " << customer_cost_contribution_m[i] << ", " 
-                        << customer_cost_contribution_n[i] << std::endl;
-            }
+            // std::cout << "Customer contribution: " << std::endl;
+            // for (int i = 0; i < dim; ++i) {
+            //     if (customer_x_contribution[i] > TOLERANCE)
+            //         std::cout << "Customer " << i << ": " << customer_cost_contribution_m[i] << ", " 
+            //             << customer_cost_contribution_n[i] << std::endl;
+            // }
 
-            std::cout << "Customer x contribution: " << std::endl;
-            for (int i = 0; i < dim; ++i) {
-                if (customer_x_contribution[i] > TOLERANCE)
-                    std::cout << "Customer " << i << ": " << customer_x_contribution[i] << std::endl;
-            }
+            // std::cout << "Customer x contribution: " << std::endl;
+            // for (int i = 0; i < dim; ++i) {
+            //     if (customer_x_contribution[i] > TOLERANCE)
+            //         std::cout << "Customer " << i << ": " << customer_x_contribution[i] << std::endl;
+            // }
 
 
             double max_m_bar = 0.0;
@@ -377,18 +425,23 @@ namespace RouteOpt::Branching::CandidateSelector {
                 }
             }
 
-            // std::cout << "max_m_bar = " << max_m_bar << ", min_n_bar = " << min_n_bar << ", real_n_bar = " << real_n_bar << std::endl;
+            std::cout << "max_m_bar = " << max_m_bar << ", min_n_bar = " << min_n_bar << ", real_n_bar = " << real_n_bar << std::endl;
 
 
             if (!branch_on_m && !branch_on_n) {
                 std::cout << "Both m and n are integer, no need to branch" << std::endl;
-                if ((max_m_bar < min_n_bar) && (max_m_bar > lb_m + TOLERANCE) && (max_m_bar < ub_m - TOLERANCE)) {
-                    node->setBranchOnM(true);
-                    node->setBranchOnN(false);
-                    node->setBigU(max_m_bar);
-                    std::cout << "set big_U = " << max_m_bar << std::endl;
-                    return;
-                }
+                // if ((max_m_bar < min_n_bar) && (max_m_bar > lb_m + TOLERANCE) && (max_m_bar < ub_m - TOLERANCE)) {
+                //     node->setBranchOnM(true);
+                //     node->setBranchOnN(false);
+                //     node->setBigU(max_m_bar);
+                //     std::cout << "set big_U = " << max_m_bar << std::endl;
+
+                //     // node->setBranchOnM(false);
+                //     // node->setBranchOnN(true);
+                //     // node->setBigL(real_n_bar);
+                //     // std::cout << "set big_L = " << real_n_bar << std::endl;
+                //     return;
+                // }
                 node->setBranchOnM(branch_on_m);
                 node->setBranchOnN(branch_on_n);
 
@@ -398,18 +451,18 @@ namespace RouteOpt::Branching::CandidateSelector {
 
 
 
-            // find the largest contribution in the customer_contribution vector
-            double max_contribution = 0.0;
-            int last_customer = -1;
-            for (int i = 1; i < dim; ++i) {
-                if (equalFloat(customer_x_contribution[i], 1., TOLERANCE)) continue; // skip if the customer is not in the solution
-                if (customer_cost_contribution_m[i] > max_contribution) {
-                    max_contribution = customer_cost_contribution_m[i];
-                    last_customer = i;
-                }
-            }
+            // // find the largest contribution in the customer_contribution vector
+            // double max_contribution = 0.0;
+            // int last_customer = -1;
+            // for (int i = 1; i < dim; ++i) {
+            //     if (equalFloat(customer_x_contribution[i], 1., TOLERANCE)) continue; // skip if the customer is not in the solution
+            //     if (customer_cost_contribution_m[i] > max_contribution) {
+            //         max_contribution = customer_cost_contribution_m[i];
+            //         last_customer = i;
+            //     }
+            // }
 
-            std::cout << "last customer = " << last_customer << ", contribution = " << max_contribution << std::endl;
+            // std::cout << "last customer = " << last_customer << ", contribution = " << max_contribution << std::endl;
 
 
 
@@ -441,47 +494,52 @@ namespace RouteOpt::Branching::CandidateSelector {
             }
 
 
-            double big_U = (1 + alpha) * UB_L;
-            double big_L = (1 - alpha) * LB_U;
+            // double big_U = (1 + alpha) * UB_L;
+            // double big_L = (1 - alpha) * LB_U;
 
-            if ((big_U - lb_m <= TOLERANCE) || (big_U - ub_m >= TOLERANCE)) branch_on_m = false;
-            if ((big_L - lb_n <= TOLERANCE) || (big_L - ub_n >= TOLERANCE)) branch_on_n = false;
+            double big_U = UB_L;
+            double big_L = LB_U;
 
-
-            if (!branch_on_m && !branch_on_n) {
-                std::cout << "Both big U and big L are out of range, no need to branch" << std::endl;
-                node->setBranchOnM(branch_on_m);
-                node->setBranchOnN(branch_on_n);
-                return;
-            }
+            // if ((big_U - lb_m <= TOLERANCE) || (big_U - ub_m >= TOLERANCE)) branch_on_m = false;
+            // if ((big_L - lb_n <= TOLERANCE) || (big_L - ub_n >= TOLERANCE)) branch_on_n = false;
 
 
-            if (branch_on_m && branch_on_n) {
-                branch_on_m = false;
-            }
+            // if (!branch_on_m && !branch_on_n) {
+            //     std::cout << "Both big U and big L are out of range, no need to branch" << std::endl;
+            //     node->setBranchOnM(branch_on_m);
+            //     node->setBranchOnN(branch_on_n);
+            //     return;
+            // }
 
-            if (branch_on_m) std::cout << "branch_on_m = true" << std::endl;
-            if (branch_on_n) std::cout << "branch_on_n = true" << std::endl;
 
+            // if (branch_on_m && branch_on_n) {
+            //     branch_on_m = false;
+            // }
+
+            
             node->setBigU(big_U);
             node->setBigL(big_L);
 
             node->setBranchOnM(branch_on_m);
             node->setBranchOnN(branch_on_n);
 
+            // if (branch_on_m) std::cout << "branch_on_m = true, " << "big_U = " << big_U << std::endl;
+            // if (branch_on_n) std::cout << "branch_on_n = true, " << "big_L = " << big_L << std::endl;
+
             node->setBranchOnCustomer(false);
             node->setBranchCustomerIdx(-1);
-            
+                
 
-            std::cout << "UB_L = " << UB_L << ", UB_U = " << UB_U << std::endl;
-            std::cout << "big_U = " << big_U << std::endl;
+            // std::cout << "UB_L = " << UB_L << ", UB_U = " << UB_U << std::endl;
+            // std::cout << "big_U = " << big_U << std::endl;
 
 
-            std::cout << "LB_U = " << LB_U << ", LB_L = " << LB_L << std::endl;
-            std::cout << "big_L = " << big_L << std::endl;
-
+            // std::cout << "LB_U = " << LB_U << ", LB_L = " << LB_L << std::endl;
+            // std::cout << "big_L = " << big_L << std::endl;
         }
 
+        
+        
         void testing_last_customer_branch(Node *node) {
 
             // 1.1 check which last customer contribute to the largest route cost
@@ -555,7 +613,7 @@ namespace RouteOpt::Branching::CandidateSelector {
                 }
             }
 
-            std::cout << "last customer = " << last_customer << ", contribution = " << max_contribution << std::endl;
+            // std::cout << "last customer = " << last_customer << ", contribution = " << max_contribution << std::endl;
 
             // find the last brc
             
@@ -571,17 +629,8 @@ namespace RouteOpt::Branching::CandidateSelector {
 
             node->setBranchOnM(false);
             node->setBranchOnN(false);
-
-            
         
-        
-        
-        
-        
-        
-        
-        
-        }
+        } 
 
         /**
          * @brief Updates the BKF controllers with the measured testing times.

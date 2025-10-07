@@ -16,6 +16,8 @@ cd ..
 
 # ./bin/cvrp instance/P-n20-k2.vrp -u 230
 
+# ./bin/cvrp instance/B/B-n31-k5.vrp -u 740
+
 # ./bin/cvrp instance/B/B-n57-k9.vrp -u 1757
 
 # ./bin/cvrp instance/XML10/XML10_1111_03.vrp -u 4800

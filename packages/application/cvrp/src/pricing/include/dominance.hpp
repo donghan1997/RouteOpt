@@ -51,7 +51,7 @@ namespace RouteOpt::Application::CVRP {
         // // }
         // // std::cout << std::endl;
 
-        // std::vector<int> fix_path = {2, 5, 12};
+        // std::vector<int> fix_path = {13, 6, 15};
         // if (col_j.size() == fix_path.size()) {
         //     if (col_j == fix_path) {
                 
@@ -126,7 +126,8 @@ namespace RouteOpt::Application::CVRP {
             double real_rc_gap = rc_gap + (prod1 < prod2 ? prod2 : prod1);
             if (real_rc_gap >= -RC_TOLERANCE) return false;
 
-            double range_gap = theta_max - ki->cost;
+            double range_gap = ki->cost < kj->cost ?  theta_max - ki->cost : theta_max - kj->cost;
+            // std::min(ki->cost,kj->cost);
             if (range_gap >= -RC_TOLERANCE) return false;
 
             // for (int i = 1; i < dim; ++i) {

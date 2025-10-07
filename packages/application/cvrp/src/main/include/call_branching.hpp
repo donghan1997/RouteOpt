@@ -10,6 +10,7 @@
 #include <numeric>
 #include <route_opt_macro.hpp>
 #include "global_config.hpp"
+#include "candidate_selector_macro.hpp"
 
 namespace RouteOpt::Application::CVRP {
     namespace TestingDetail {
@@ -153,35 +154,148 @@ namespace RouteOpt::Application::CVRP {
 
     template<bool if_exact>
     void CVRPSolver::processCGTesting(BbNode *node, const std::pair<int, int> &edge, double &dif1, double &dif2) {
-        std::cout << "evaluate on edge: " << edge.first << "-" << edge.second << std::endl;
-        auto &node_solver = node->refSolver();
 
+        auto &node_solver = node->refSolver();
         double tmp_val, org_val = node->getValue();
-        std::vector<int> solver_ind;
-        std::vector<double> solver_val;
-        node->obtainBrcCoefficient(edge, solver_ind, solver_val);
 
         int b4_num_row;
         SAFE_SOLVER(node_solver.getNumRow(&b4_num_row))
 
-        if (node->getIfInEnumState())
-            node->addBranchConstraint2ColPoolInEnumByColMap(
-                edge, pricing_controller.getColumnPoolPtr());
+        if (edge.first == edge.second) {
 
-        node->refBrCs().emplace_back(Brc{edge, b4_num_row, false});
-        TestingDetail::addBranchConstraint(solver_ind, solver_val, node_solver);
-        TestingDetail::callPricingInTesting<if_exact>(this, node, tmp_val);
-        dif1 = TestingDetail::calculateDifference(tmp_val, org_val);
 
-        node->refBrCs().back().br_dir = true;
-        TestingDetail::inverseLastBranchConstraint(node_solver);
-        TestingDetail::callPricingInTesting<if_exact>(this, node, tmp_val);
-        dif2 = TestingDetail::calculateDifference(tmp_val, org_val);
+            int num_col;
+            SAFE_SOLVER(node_solver.getNumCol(&num_col))
 
-        SAFE_SOLVER(node_solver.delConstraints(1, &b4_num_row))
-        SAFE_SOLVER(node_solver.updateModel())
-        node->refBrCs().pop_back();
-        if (node->getIfInEnumState())node->refMatrixColPool().pop_back();
+
+            std::vector<int> cbeg;
+            std::vector<int> cind;
+            std::vector<double> cval;
+            int numnzP;
+            int start = node->getDim();
+            SAFE_SOLVER(node_solver.getConstraints(&numnzP, nullptr, nullptr, nullptr, start, 1))
+            cbeg.resize(numnzP+1);
+            cind.resize(numnzP);
+            cval.resize(numnzP);
+            SAFE_SOLVER(node_solver.getConstraints(&numnzP, cbeg.data(), cind.data(), cval.data(), start, 1))
+
+            std::vector<double> rhs_m_n(4);
+            SAFE_SOLVER(node_solver.getRhs(3*start-1+1, 4, rhs_m_n.data()))
+            double lb_m = rhs_m_n[0];
+            double ub_m = rhs_m_n[1];
+            double lb_n = rhs_m_n[2];
+            double ub_n = rhs_m_n[3];
+            
+            if (node->getBranchOnM()){
+                double upper_m = node->getBigU();
+                // m >= LB
+                TestingDetail::addRangeBranchConstraint(3*start-1+1, static_cast<int>(upper_m)+1, node_solver);
+                TestingDetail::callPricingInTesting<if_exact>(this, node, tmp_val);
+
+
+                dif1 = TestingDetail::calculateDifference(tmp_val, org_val);
+
+                // double rhs;
+                SAFE_SOLVER(node_solver.setRhs(3*start, 1, &lb_m))
+                SAFE_SOLVER(node_solver.updateModel())
+
+                // m <= UB
+                node->refBrCs().back().br_dir = true;
+                TestingDetail::addRangeBranchConstraint(3*start+1, static_cast<int>(upper_m), node_solver);
+                std::vector<int> solver_ind;
+                std::vector<double> solver_val;
+                for (int i = 3; i < num_col; ++i) {
+                    if (cval[i-2] - static_cast<int>(upper_m) >= TOLERANCE) {
+                        solver_ind.emplace_back(i);
+                        solver_val.emplace_back(1.0);
+                    }
+                }
+                TestingDetail::addRangeConstraint(solver_ind, solver_val, node_solver);
+                TestingDetail::callPricingInTesting<if_exact>(this, node, tmp_val);
+                dif2 = TestingDetail::calculateDifference(tmp_val, org_val);
+
+                SAFE_SOLVER(node_solver.delConstraints(1, &b4_num_row))
+                SAFE_SOLVER(node_solver.setRhs(3*start+1, 1, &ub_m))
+                SAFE_SOLVER(node_solver.updateModel())
+                node->refBrCs().pop_back();    
+            
+            }
+            else if (node->getBranchOnN()) {
+                double upper_n = node->getBigL();
+                double lower_n = std::ceil(upper_n);
+
+                // n >= LB
+                node->refBrCs().emplace_back(Brc{edge, b4_num_row, true});
+                TestingDetail::addRangeBranchConstraint(3*start+1+1, static_cast<int>(lower_n), node_solver);
+                std::vector<int> solver_ind;
+                std::vector<double> solver_val;
+                for (int i = 3; i < num_col; ++i) {
+                    if (cval[i-2] - static_cast<int>(lower_n) <= TOLERANCE) {
+                        solver_ind.emplace_back(i);
+                        solver_val.emplace_back(1.0);
+                    }
+                }
+                TestingDetail::addRangeConstraint(solver_ind, solver_val, node_solver);
+                TestingDetail::callPricingInTesting<if_exact>(this, node, tmp_val);
+
+                dif1 = TestingDetail::calculateDifference(tmp_val, org_val);
+
+                SAFE_SOLVER(node_solver.delConstraints(1, &b4_num_row))
+                SAFE_SOLVER(node_solver.setRhs(3*start+2, 1, &lb_n))
+                SAFE_SOLVER(node_solver.updateModel())
+                
+                // n <= UB
+                node->refBrCs().back().br_dir = false;
+                TestingDetail::addRangeBranchConstraint(3*start+2+1, static_cast<int>(lower_n)-1, node_solver);
+                TestingDetail::callPricingInTesting<if_exact>(this, node, tmp_val);
+                
+                dif2 = TestingDetail::calculateDifference(tmp_val, org_val);
+
+                // double rhs;
+                SAFE_SOLVER(node_solver.setRhs(3*start+3, 1, &ub_n))
+                SAFE_SOLVER(node_solver.updateModel())
+                node->refBrCs().pop_back();
+
+            }
+            else {
+                std::cout << "no branching on m and n" << std::endl;
+                return;
+            }
+
+
+        }
+        else {
+            std::cout << "evaluate on edge: " << edge.first << "-" << edge.second << std::endl;
+            // auto &node_solver = node->refSolver();
+
+            // double tmp_val, org_val = node->getValue();
+            std::vector<int> solver_ind;
+            std::vector<double> solver_val;
+            node->obtainBrcCoefficient(edge, solver_ind, solver_val);
+
+            // int b4_num_row;
+            // SAFE_SOLVER(node_solver.getNumRow(&b4_num_row))
+
+            if (node->getIfInEnumState())
+                node->addBranchConstraint2ColPoolInEnumByColMap(
+                    edge, pricing_controller.getColumnPoolPtr());
+
+            node->refBrCs().emplace_back(Brc{edge, b4_num_row, false});
+            TestingDetail::addBranchConstraint(solver_ind, solver_val, node_solver);
+            TestingDetail::callPricingInTesting<if_exact>(this, node, tmp_val);
+            dif1 = TestingDetail::calculateDifference(tmp_val, org_val);
+
+            node->refBrCs().back().br_dir = true;
+            TestingDetail::inverseLastBranchConstraint(node_solver);
+            TestingDetail::callPricingInTesting<if_exact>(this, node, tmp_val);
+            dif2 = TestingDetail::calculateDifference(tmp_val, org_val);
+
+            SAFE_SOLVER(node_solver.delConstraints(1, &b4_num_row))
+            SAFE_SOLVER(node_solver.updateModel())
+            node->refBrCs().pop_back();
+            if (node->getIfInEnumState())node->refMatrixColPool().pop_back();
+
+        }
     }
 
 
@@ -215,43 +329,309 @@ namespace RouteOpt::Application::CVRP {
 
     inline void CVRPSolver::processLPTesting(BbNode *node, const std::pair<int, int> &edge, double &dif1,
                                              double &dif2) {
+        
         auto &node_solver = node->refSolver();
         SAFE_SOLVER(node_solver.setEnvCrossOver(SOLVER_CROSSOVER_DOWN))
+        // SAFE_SOLVER(node_solver.setEnvOutputFlag(1, false))
 
         double tmp_val, org_val = node->getValue();
-        std::vector<int> solver_ind;
-        std::vector<double> solver_val;
-        node->obtainBrcCoefficient(edge, solver_ind, solver_val);
-
         int num_row;
-        SAFE_SOLVER(node_solver.getNumRow(&num_row))
+        SAFE_SOLVER(node_solver.getNumRow(&num_row))                                        
+        if (edge.first == edge.second) {
 
-        TestingDetail::addBranchConstraint(solver_ind, solver_val, node_solver);
+            int num_col;
+            SAFE_SOLVER(node_solver.getNumCol(&num_col))
 
-        SAFE_SOLVER(node_solver.reoptimize(SOLVER_BARRIER))
-        SAFE_SOLVER(node_solver.getObjVal(&tmp_val))
+            std::vector<int> cbeg;
+            std::vector<int> cind;
+            std::vector<double> cval;
+            int numnzP;
+            int start = node->getDim();
+            SAFE_SOLVER(node_solver.getConstraints(&numnzP, nullptr, nullptr, nullptr, start, 1))
+            cbeg.resize(numnzP+1);
+            cind.resize(numnzP);
+            cval.resize(numnzP);
+            SAFE_SOLVER(node_solver.getConstraints(&numnzP, cbeg.data(), cind.data(), cval.data(), start, 1))
 
-        dif1 = TestingDetail::calculateDifference(tmp_val, org_val);
+            
+            bool branch_on_m = node->getBranchOnM();
+            bool branch_on_n = node->getBranchOnN();
 
-        if constexpr (ml_type != ML_TYPE::ML_NO_USE) {
-            l2b_controller.collectResolvingDualRC(node->refSolver(), edge, num_row, true);
+            bool branch_on_customer = node->getBranchOnCustomer();
+
+            if (!branch_on_m && !branch_on_n && branch_on_customer) {
+
+                node->setBranchOnCustomer(false);
+                node->setBranchCustomerIdx(-1);
+
+                std::vector<double> xval(num_col);
+                SAFE_SOLVER(node_solver.getX(0, num_col, xval.data()))
+                int dim = node->getDim();
+                const auto &col = node->getCols();
+
+                // for different customer do the branching
+                std::vector<double> customer_cost_contribution_m(dim, 0.0);
+                std::vector<double> customer_cost_contribution_n(dim, 0.0);
+                std::vector<double> customer_x_contribution(dim, 0.0);
+
+                for (int i = 3; i < num_col; ++i) {
+                    if (xval[i] > SOL_X_TOLERANCE) {
+                        auto &ci = col[i-2];
+                        auto &seq = ci.col_seq;
+                        double cost = cval[i-2];
+                        // find the last customer in the sequence
+                        if (!seq.empty()) {
+                            int last_customer = seq.back();
+                            customer_cost_contribution_m[last_customer] += cost * xval[i];
+                            customer_cost_contribution_n[last_customer] += (cost - global_config.BIG_M) * xval[i];
+                            customer_x_contribution[last_customer] += xval[i];
+                        }
+                    }
+                }
+
+                // sort customer_x_contribution
+                std::vector<int> cus_idx(dim-1);
+                std::iota(cus_idx.begin(), cus_idx.end(), 1);
+                std::sort(cus_idx.begin(), cus_idx.end(), [&](int a, int b) {
+                    return customer_x_contribution[a] > customer_x_contribution[b];
+                });
+
+                int test_size = std::min(3, dim -1);
+                int cnt_tested = 0;
+                double max_abs_diff = -1.0;
+                for (int i = 0; i < cus_idx.size(); ++i) {
+                    if (equalFloat(customer_x_contribution[cus_idx[i]], 1., TOLERANCE)) continue;
+                    if (equalFloat(customer_x_contribution[cus_idx[i]], 0., TOLERANCE)) continue;
+
+
+                    int branch_customer_idx = cus_idx[i];
+                    ++cnt_tested;
+                    if (cnt_tested > test_size) break;
+
+                    std::vector<int> solver_ind;
+                    std::vector<double> solver_val;
+
+                    for (int i = 1; i < col.size(); ++i) {
+                        if (col[i].col_seq.back() == branch_customer_idx) {
+                            solver_ind.emplace_back(i + 2);
+                            solver_val.emplace_back(1.0);
+                        }
+                    }
+                    TestingDetail::addCustomerBranchConstraint(solver_ind, solver_val, node_solver, true);
+                    SAFE_SOLVER(node_solver.reoptimize(SOLVER_BARRIER))
+                    SAFE_SOLVER(node_solver.getObjVal(&tmp_val))
+
+                    dif1 = TestingDetail::calculateDifference(tmp_val, org_val);
+                    SAFE_SOLVER(node_solver.delConstraints(1, &num_row))
+                    SAFE_SOLVER(node_solver.updateModel())
+
+                    TestingDetail::addCustomerBranchConstraint(solver_ind, solver_val, node_solver, false);
+                    SAFE_SOLVER(node_solver.reoptimize(SOLVER_BARRIER))
+                    SAFE_SOLVER(node_solver.getObjVal(&tmp_val))
+
+
+                    dif2 = TestingDetail::calculateDifference(tmp_val, org_val);
+                    SAFE_SOLVER(node_solver.delConstraints(1, &num_row))
+                    SAFE_SOLVER(node_solver.updateModel())
+                    // SAFE_SOLVER(node_solver.setEnvCrossOver(SOLVER_CROSSOVER_DEFAULT))
+
+                    // std::cout << "branching on customer " << branch_customer_idx << ", dif1 = " << dif1 << ", dif2 = " << dif2 << std::endl;
+
+                    double current_abs_diff = std::abs(dif1 - dif2);
+                    if (current_abs_diff > max_abs_diff) {
+                        max_abs_diff = current_abs_diff;
+                        node->setBranchOnCustomer(true);
+                        node->setBranchCustomerIdx(branch_customer_idx);
+                        // std::cout << "Decide to branch on customer " << branch_customer_idx << std::endl;
+                    }
+
+                }
+
+                SAFE_SOLVER(node_solver.setEnvCrossOver(SOLVER_CROSSOVER_DEFAULT))
+
+                return;
+ 
+                
+            }
+
+
+            std::vector<double> rhs_m_n(4);
+            SAFE_SOLVER(node_solver.getRhs(3*start-1+1, 4, rhs_m_n.data()))
+            double lb_m = rhs_m_n[0];
+            double ub_m = rhs_m_n[1];
+            double lb_n = rhs_m_n[2];
+            double ub_n = rhs_m_n[3];
+            
+            // Here we need to check different alpha values
+            std::vector<double> alpha_list = {0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5};
+            
+            double UB_L = node->getBigU();
+            double LB_U = node->getBigL();
+
+            for (const auto &alpha : alpha_list){
+
+                // std::cout << "Testing with alpha = " << alpha << std::endl;
+                double big_U = (1 + alpha) * UB_L;
+                double big_L = (1 - alpha) *  LB_U;
+
+                if ((big_U - lb_m <= TOLERANCE) || (big_U - ub_m >= TOLERANCE)) branch_on_m = false;
+                if ((big_L - lb_n <= TOLERANCE) || (big_L - ub_n >= TOLERANCE)) branch_on_n = false;
+
+                if (!branch_on_m && !branch_on_n) {
+                    std::cout << "Both big U and big L are out of range, no need to test" << std::endl;
+                    continue;
+                }
+                else {
+                    if (branch_on_m){
+
+                        
+                        double upper_m = big_U;
+
+                        // m >= LB
+                        TestingDetail::addRangeBranchConstraint(3*start-1+1, static_cast<int>(upper_m)+1, node_solver);
+
+                        SAFE_SOLVER(node_solver.reoptimize(SOLVER_BARRIER))
+                        SAFE_SOLVER(node_solver.getObjVal(&tmp_val))
+
+                        dif1 = TestingDetail::calculateDifference(tmp_val, org_val);
+
+                        // double rhs;
+                        SAFE_SOLVER(node_solver.setRhs(3*start, 1, &lb_m))
+                        SAFE_SOLVER(node_solver.updateModel())
+
+                        // m <= UB
+                        TestingDetail::addRangeBranchConstraint(3*start+1, static_cast<int>(upper_m), node_solver);
+                        std::vector<int> solver_ind;
+                        std::vector<double> solver_val;
+                        for (int i = 3; i < num_col; ++i) {
+                            if (cval[i-2] - static_cast<int>(upper_m) >= TOLERANCE) {
+                                solver_ind.emplace_back(i);
+                                solver_val.emplace_back(1.0);
+                            }
+                        }
+                        TestingDetail::addRangeConstraint(solver_ind, solver_val, node_solver);
+                        
+                        SAFE_SOLVER(node_solver.reoptimize(SOLVER_BARRIER))
+                        SAFE_SOLVER(node_solver.getObjVal(&tmp_val))
+                        dif2 = TestingDetail::calculateDifference(tmp_val, org_val);
+
+
+                        SAFE_SOLVER(node_solver.delConstraints(1, &num_row))
+                        SAFE_SOLVER(node_solver.setRhs(3*start+1, 1, &ub_m))
+                        SAFE_SOLVER(node_solver.updateModel())
+                        // SAFE_SOLVER(node_solver.setEnvCrossOver(SOLVER_CROSSOVER_DEFAULT))
+
+                        // std::cout << "branch_on_m = true, " << "big_U = " << big_U << ", m >= LB, dif1 = " << dif1 << ", m <= UB, dif2 = " << dif2 << std::endl;
+                        if (dif1 + dif2 > 1){
+                            node->setBranchOnM(branch_on_m);
+                            node->setBigU(big_U);
+                        }
+                    }
+
+                    if (branch_on_n) {
+                        double upper_n = big_L;
+                        double lower_n = std::ceil(upper_n);
+
+                        // n <= UB
+                        TestingDetail::addRangeBranchConstraint(3*start+2+1, static_cast<int>(lower_n)-1, node_solver);
+
+                        SAFE_SOLVER(node_solver.reoptimize(SOLVER_BARRIER))
+                        SAFE_SOLVER(node_solver.getObjVal(&tmp_val))
+
+                        dif1 = TestingDetail::calculateDifference(tmp_val, org_val);
+
+                        // double rhs;
+                        SAFE_SOLVER(node_solver.setRhs(3*start+3, 1, &ub_n))
+                        SAFE_SOLVER(node_solver.updateModel())
+
+                        // n >= LB
+                        TestingDetail::addRangeBranchConstraint(3*start+1+1, static_cast<int>(lower_n), node_solver);
+                        std::vector<int> solver_ind;
+                        std::vector<double> solver_val;
+                        for (int i = 3; i < num_col; ++i) {
+                            if (cval[i-2] - static_cast<int>(lower_n) <= TOLERANCE) {
+                                solver_ind.emplace_back(i);
+                                solver_val.emplace_back(1.0);
+                            }
+                        }
+                        TestingDetail::addRangeConstraint(solver_ind, solver_val, node_solver);
+                        
+                        SAFE_SOLVER(node_solver.reoptimize(SOLVER_BARRIER))
+                        SAFE_SOLVER(node_solver.getObjVal(&tmp_val))
+                        dif2 = TestingDetail::calculateDifference(tmp_val, org_val);
+
+
+                        SAFE_SOLVER(node_solver.delConstraints(1, &num_row))
+                        SAFE_SOLVER(node_solver.setRhs(3*start+2, 1, &lb_n))
+                        SAFE_SOLVER(node_solver.updateModel())
+                        // SAFE_SOLVER(node_solver.setEnvCrossOver(SOLVER_CROSSOVER_DEFAULT))
+
+                        // std::cout << "branch_on_n = true, " << "big_L = " << big_L << ", n <= UB, dif1 = " << dif1 << ", n >= LB, dif2 = " << dif2 << std::endl;
+                        if (dif1 + dif2 > 1){
+                            node->setBranchOnN(branch_on_n);
+                            node->setBigL(big_L);
+                        }
+
+                    }
+
+                    
+                }
+                
+            }
+
+            SAFE_SOLVER(node_solver.setEnvCrossOver(SOLVER_CROSSOVER_DEFAULT))
+
+            // exit(0);
+
+
+
+            
+
+
+
+            
         }
+        else{
+            // auto &node_solver = node->refSolver();
+            // SAFE_SOLVER(node_solver.setEnvCrossOver(SOLVER_CROSSOVER_DOWN))
 
-        TestingDetail::inverseLastBranchConstraint(node_solver);
+            // double tmp_val, org_val = node->getValue();
+            std::vector<int> solver_ind;
+            std::vector<double> solver_val;
+            node->obtainBrcCoefficient(edge, solver_ind, solver_val);
 
-        SAFE_SOLVER(node_solver.reoptimize(SOLVER_BARRIER))
-        SAFE_SOLVER(node_solver.getObjVal(&tmp_val))
-        dif2 = TestingDetail::calculateDifference(tmp_val, org_val);
+            // int num_row;
+            // SAFE_SOLVER(node_solver.getNumRow(&num_row))
 
-        if constexpr (ml_type != ML_TYPE::ML_NO_USE) {
-            l2b_controller.collectResolvingDualRC(node->refSolver(), edge, num_row, false);
+            TestingDetail::addBranchConstraint(solver_ind, solver_val, node_solver);
+
+            SAFE_SOLVER(node_solver.reoptimize(SOLVER_BARRIER))
+            SAFE_SOLVER(node_solver.getObjVal(&tmp_val))
+
+            dif1 = TestingDetail::calculateDifference(tmp_val, org_val);
+
+            if constexpr (ml_type != ML_TYPE::ML_NO_USE) {
+                l2b_controller.collectResolvingDualRC(node->refSolver(), edge, num_row, true);
+            }
+
+            TestingDetail::inverseLastBranchConstraint(node_solver);
+
+            SAFE_SOLVER(node_solver.reoptimize(SOLVER_BARRIER))
+            SAFE_SOLVER(node_solver.getObjVal(&tmp_val))
+            dif2 = TestingDetail::calculateDifference(tmp_val, org_val);
+
+            if constexpr (ml_type != ML_TYPE::ML_NO_USE) {
+                l2b_controller.collectResolvingDualRC(node->refSolver(), edge, num_row, false);
+            }
+
+            SAFE_SOLVER(node_solver.delConstraints(1, &num_row))
+            SAFE_SOLVER(node_solver.updateModel())
+            SAFE_SOLVER(node_solver.setEnvCrossOver(SOLVER_CROSSOVER_DEFAULT))
+
         }
-
-        SAFE_SOLVER(node_solver.delConstraints(1, &num_row))
-        SAFE_SOLVER(node_solver.updateModel())
-        SAFE_SOLVER(node_solver.setEnvCrossOver(SOLVER_CROSSOVER_DEFAULT))
+        
     };
-
+    
     inline void BbNode::obtainBrcMap() {
 
         // std::cout << "number of routes : " << cols.size() << std::endl;
@@ -388,6 +768,12 @@ namespace RouteOpt::Application::CVRP {
         std::unordered_map<std::pair<int, int>, double, PairHasher> edge_map;
         edge_map.clear();
         edge_map.reserve(dim * dim);
+
+        // if (node->getBranchOnM() || node->getBranchOnN()) {
+        //     edge_map[{node->getDim(), node->getDim()}] = 1.;
+        //     return edge_map;
+        // }
+
         auto &cols = node->cols;
         std::vector<double> x(cols.size());
 
@@ -411,10 +797,10 @@ namespace RouteOpt::Application::CVRP {
 
         // print the edge_map
         global_config.ALL_EDGES_IF_ONE = true; //assume all edges are 1.
-        std::cout << "Edge map size: " << edge_map.size() << std::endl;
+        // std::cout << "Edge map size: " << edge_map.size() << std::endl;
         for (const auto &pair : edge_map) {
-            std::cout << "Edge: " << pair.first.first << "-" << pair.first.second
-                      << ", Value: " << pair.second << std::endl;
+            // std::cout << "Edge: " << pair.first.first << "-" << pair.first.second
+            //           << ", Value: " << pair.second << std::endl;
             if (!equalFloat(pair.second, 1., EDGE_IF_ONE_TOLERANCE))
                 global_config.ALL_EDGES_IF_ONE = false; //if one edge is not 1, then set the flag to false
         }

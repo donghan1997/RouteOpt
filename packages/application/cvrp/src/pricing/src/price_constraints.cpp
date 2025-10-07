@@ -136,6 +136,7 @@ namespace RouteOpt::Application::CVRP {
         theta_max = 0.0;
         for (auto &brc: brcs) {
             if ((brc.edge.first==dim) && (brc.edge.second==dim)) {
+                // if (brc.range.second > theta_max) theta_max = brc.range.second;
                 if (brc.range.first == 1) { // m
                     if (brc.range.second > theta_max) theta_max = brc.range.second;
                 }

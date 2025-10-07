@@ -64,6 +64,35 @@ namespace RouteOpt::Branching::CandidateSelector {
                             std::terminate(); //in case the compiler complains
                     }
                 }();
+        
+        
+        if (node->getBranchOnM() || node->getBranchOnN()) {
+            double dif1, dif2;
+            BrCType edge;
+            edge.first = node->getDim();
+            edge.second = node->getDim();
+            processTestingFunction(node, edge, dif1, dif2);
+            PRINT_REMIND("Duing " + marker + " testing for range branching:");
+            if (node->getBranchOnM()) {
+                std::cout << "Branch on M with big_U = " << node->getBigU() << std::endl;
+            }
+            if (node->getBranchOnN()) {
+                std::cout << "Branch on N with big_L = " << node->getBigL() << std::endl;
+            }
+            return;
+        }
+
+        if (node->getBranchOnCustomer()) {
+            double dif1, dif2;
+            BrCType edge;
+            edge.first = node->getDim();
+            edge.second = node->getDim();
+            processTestingFunction(node, edge, dif1, dif2);
+            PRINT_REMIND("Duing " + marker + " testing for last customer branching:");
+            // if (node->getBranchOnCustomer())
+            //     std::cout << "Branch on customer: " << node->getBranchCustomerIdx() << std::endl;
+            return;
+        }
 
 
         auto &branch_pair = branching_data_shared.refBranchPair();
@@ -120,26 +149,6 @@ namespace RouteOpt::Branching::CandidateSelector {
             CandidateSelectorDetail::printScore(edge_info);
         )
     }
-
-
-
-    // void testing_range_branch(Node *node) {
-    
-        
-
-    //     // std::vector<double> rhs_m_n(4);
-    //     // SAFE_SOLVER(node->refSolver().getRhs(3*start, 4, rhs_m_n.data()))
-    //     // if ((std::abs(xval[branch_var_idx_m]-rhs_m_n[0]) <= TOLERANCE) && (std::abs(xval[branch_var_idx_m]-rhs_m_n[1]) <= TOLERANCE)) {
-    //     //     branch_on_m = false;
-    //     //     branch_on_n = true;
-    //     // }
-    //     // if ((std::abs(xval[branch_var_idx_n]-rhs_m_n[2]) <= TOLERANCE) && (std::abs(xval[branch_var_idx_n]-rhs_m_n[3]) <= TOLERANCE)) {
-    //     //     branch_on_n = false;
-    //     //     branch_on_m = true;
-    //     // }
-
-    // }
-
 
 
 
