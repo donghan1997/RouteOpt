@@ -34,10 +34,18 @@ namespace RouteOpt::Application::CVRP {
                 std::stringstream convert(argv[++i]);
                 if (!(convert >> ub_ref.get())) {
                     printf("Invalid number: %s\n", argv[i]);
+                } else {
+                    std::cout << "Set initial UB to: " << ub_ref.get() << std::endl;
                 }
-                else {
-                    global_config.BIG_M = ub_ref.get();
-                    global_config.Budget = ub_ref.get();
+            }
+            else if (arg == "-m" && i + 1 < argc) {
+                std::stringstream convert(argv[++i]);
+                double val;
+                if (!(convert >> val)) {
+                    printf("Invalid number for -m: %s\n", argv[i]);
+                } else {
+                    global_config.BIG_M = val;
+                    global_config.Budget = val;
                     std::cout << "Set BIG_M and Budget to: " << global_config.BIG_M << std::endl;
                 }
             } else if (arg == "-b" && i + 1 < argc) {

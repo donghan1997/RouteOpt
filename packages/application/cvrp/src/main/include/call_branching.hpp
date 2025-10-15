@@ -799,8 +799,8 @@ namespace RouteOpt::Application::CVRP {
         global_config.ALL_EDGES_IF_ONE = true; //assume all edges are 1.
         // std::cout << "Edge map size: " << edge_map.size() << std::endl;
         for (const auto &pair : edge_map) {
-            // std::cout << "Edge: " << pair.first.first << "-" << pair.first.second
-            //           << ", Value: " << pair.second << std::endl;
+            std::cout << "Edge: " << pair.first.first << "-" << pair.first.second
+                      << ", Value: " << pair.second << std::endl;
             if (!equalFloat(pair.second, 1., EDGE_IF_ONE_TOLERANCE))
                 global_config.ALL_EDGES_IF_ONE = false; //if one edge is not 1, then set the flag to false
         }

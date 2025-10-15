@@ -36,6 +36,7 @@ namespace RouteOpt {
     constexpr double SOL_X_TOLERANCE = 1e-8;
     constexpr double RC_TOLERANCE = -1e-5;
     constexpr double DUAL_TOLERANCE = 1e-6;
+    constexpr double ZERO_SNAP_TOL = 1e-10;
 
     // Define a bitset type for representing customer routes with a fixed maximum size.
     using routeOptLong = std::bitset<MAX_NUM_CUSTOMERS>;

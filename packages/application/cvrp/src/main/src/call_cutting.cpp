@@ -695,6 +695,7 @@ namespace RouteOpt::Application::CVRP {
 
         //
         if (!node->getIfTerminate()) {
+
             SAFE_SOLVER(node->refSolver().reoptimize())
             x.resize(cols.size()+2);
             SAFE_SOLVER(node->refSolver().getX(0, cols.size()+2, x.data()))
@@ -702,11 +703,11 @@ namespace RouteOpt::Application::CVRP {
             // x0.resize(1);
             // SAFE_SOLVER(node->refSolver().getX(0, 1, x0.data()))
             // x[0] = x0[0];
-
+            auto sol_edge_map = BbNode::obtainSolEdgeMap(node);
+            
 
             double obj;
             SAFE_SOLVER(node->refSolver().getObjVal(&obj))
-            std::cout << "obj = " << obj << std::endl;
             bool if_integer, if_feasible;
             updateIntegerSolution(obj, x, cols, if_integer, if_feasible);
             if (if_integer && if_feasible) {

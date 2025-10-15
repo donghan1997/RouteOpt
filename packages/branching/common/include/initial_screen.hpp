@@ -132,6 +132,8 @@ namespace RouteOpt::Branching {
     void BranchingHistory<BrCType, Hasher>::recordExactPerScore(const BrCType &edge, double old_val, double now_val,
                                                                 bool dir,
                                                                 int tree_level) {
+        if (std::abs(old_val) < ZERO_SNAP_TOL) old_val = 0.0;
+        if (std::abs(now_val) < ZERO_SNAP_TOL) now_val = 0.0;
         auto dif = now_val - old_val;
         if (dif < RC_TOLERANCE * now_val) {
             THROW_RUNTIME_ERROR("branching leads to a decreasing in lb: from " + std::to_string(old_val) + " to " +

@@ -211,57 +211,57 @@ namespace RouteOpt::Branching::CandidateSelector {
                                         BranchingDataShared<BrCType, Hasher> &branching_data_shared,
                                         const std::unordered_map<BrCType, double, Hasher> &candidate_map) {
 
-            // static BrCType dummy_default;
-            // testing_range_branch(node);
-            // if (node->getBranchOnM() || node->getBranchOnN()) {
-            //     // std::cout << "Branching on range: " << (node->getBranchOnM() ? "M" : "N") 
-            //     //     << ", big value: " << (node->getBranchOnM() ? node->getBigU() : node->getBigL()) << std::endl;
+            static BrCType dummy_default;
+            testing_range_branch(node);
+            if (node->getBranchOnM() || node->getBranchOnN()) {
+                // std::cout << "Branching on range: " << (node->getBranchOnM() ? "M" : "N") 
+                //     << ", big value: " << (node->getBranchOnM() ? node->getBigU() : node->getBigL()) << std::endl;
 
-            //     testing(node, branching_history, branching_data_shared, TestingPhase::LP);
+                testing(node, branching_history, branching_data_shared, TestingPhase::LP);
 
-            //     if (node->getBranchOnM() && node->getBranchOnN()) {
-            //         // generate random number to decide which one to branch on
-            //         // static std::random_device rd;
-            //         // static std::mt19937 gen(rd());
-            //         // std::uniform_real_distribution<double> dis(0.0, 1.0);
-            //         // double rnd = dis(gen);
-            //         // if (rnd < 0.5) {
-            //         //     std::cout << "Branching on both M and N, prioritize M branching." << std::endl;
-            //         //     node->setBranchOnN(false); // reset N branching for next iteration
-            //         //     std::cout << "Branching on M with big_U = " << node->getBigU() << std::endl;
-            //         // } else {
-            //         //     std::cout << "Branching on both M and N, prioritize N branching." << std::endl;
-            //         //     node->setBranchOnM(false); // reset N branching for next iteration
-            //         //     std::cout << "Branching on N with big_L = " << node->getBigL() << std::endl;
-            //         // }
-            //         int start = node->getDim();
-            //         std::vector<double> rhs_m_n(4);
-            //         SAFE_SOLVER(node->refSolver().getRhs(3*start-1+1, 4, rhs_m_n.data()))
-            //         double lb_m = rhs_m_n[0];
-            //         double ub_m = rhs_m_n[1];
-            //         double lb_n = rhs_m_n[2];
-            //         double ub_n = rhs_m_n[3];
+                if (node->getBranchOnM() && node->getBranchOnN()) {
+                    // generate random number to decide which one to branch on
+                    // static std::random_device rd;
+                    // static std::mt19937 gen(rd());
+                    // std::uniform_real_distribution<double> dis(0.0, 1.0);
+                    // double rnd = dis(gen);
+                    // if (rnd < 0.5) {
+                    //     std::cout << "Branching on both M and N, prioritize M branching." << std::endl;
+                    //     node->setBranchOnN(false); // reset N branching for next iteration
+                    //     std::cout << "Branching on M with big_U = " << node->getBigU() << std::endl;
+                    // } else {
+                    //     std::cout << "Branching on both M and N, prioritize N branching." << std::endl;
+                    //     node->setBranchOnM(false); // reset N branching for next iteration
+                    //     std::cout << "Branching on N with big_L = " << node->getBigL() << std::endl;
+                    // }
+                    int start = node->getDim();
+                    std::vector<double> rhs_m_n(4);
+                    SAFE_SOLVER(node->refSolver().getRhs(3*start-1+1, 4, rhs_m_n.data()))
+                    double lb_m = rhs_m_n[0];
+                    double ub_m = rhs_m_n[1];
+                    double lb_n = rhs_m_n[2];
+                    double ub_n = rhs_m_n[3];
 
-            //         double range_m = ub_m - lb_m;
-            //         double range_n = ub_n - lb_n;
+                    double range_m = ub_m - lb_m;
+                    double range_n = ub_n - lb_n;
 
-            //         // prioritize branching on the variable with larger range
-            //         if (range_m >= range_n) {
-            //             std::cout << "Branching on both M and N, prioritize M branching." << std::endl;
-            //             node->setBranchOnN(false); // reset N branching for next iteration
-            //             std::cout << "Branching on M with big_U = " << node->getBigU() << std::endl;
-            //         } else {
-            //             std::cout << "Branching on both M and N, prioritize N branching." << std::endl;
-            //             node->setBranchOnM(false); // reset N branching for next iteration
-            //             std::cout << "Branching on N with big_L = " << node->getBigL() << std::endl;
-            //         }
+                    // prioritize branching on the variable with larger range
+                    if (range_m >= range_n) {
+                        std::cout << "Branching on both M and N, prioritize M branching." << std::endl;
+                        node->setBranchOnN(false); // reset N branching for next iteration
+                        std::cout << "Branching on M with big_U = " << node->getBigU() << std::endl;
+                    } else {
+                        std::cout << "Branching on both M and N, prioritize N branching." << std::endl;
+                        node->setBranchOnM(false); // reset N branching for next iteration
+                        std::cout << "Branching on N with big_L = " << node->getBigL() << std::endl;
+                    }
 
-            //     }
-            //     dummy_default.first = node->getDim();
-            //     dummy_default.second = node->getDim();
+                }
+                dummy_default.first = node->getDim();
+                dummy_default.second = node->getDim();
 
-            //     return dummy_default;
-            // }
+                return dummy_default;
+            }
 
             // exit(0);
 
