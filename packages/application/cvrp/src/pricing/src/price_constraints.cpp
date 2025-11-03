@@ -22,41 +22,6 @@ namespace RouteOpt::Application::CVRP {
         rank1_rc_controller_ref.get().getRank1DualsInCG(r1cs, pi_vector);
     }
 
-    // void CVRP_Pricing::updateBigL_U(const std::vector<double> &cval, const std::vector<double> &X, const int &num_col) {
-
-    //     double UB_L = X[1];
-    //     double UB_U = -std::numeric_limits<double>::infinity();
-
-    //     for (int i = 3; i < num_col; ++i) {
-    //         if (X[i] > TOLERANCE) {
-    //             UB_U = std::max(UB_U, cval[i-2]);
-    //         }
-    //     }
-
-    //     big_U = (1+ alpha) * UB_L;
-
-    //     if ((big_U - UB_U) >= TOLERANCE) {
-    //         big_U = (UB_U + UB_L) / 2;
-    //     }
-
-    //     double LB_U = X[2];
-    //     double LB_L = std::numeric_limits<double>::infinity();
-    //     for (int i = 3; i < num_col; ++i) {
-    //         if (X[i] > TOLERANCE) {
-    //             LB_L = std::min(LB_L, cval[i-2]);
-    //         }
-    //     }
-
-    //     big_L = (1 - alpha) * LB_U;
-
-    //     if ((big_L - LB_L) <= TOLERANCE) {
-    //         big_L = (LB_U + LB_L) / 2;
-    //     }
-
-    //     // std::cout << "big_L = " << big_L << ", big_U = " << big_U << std::endl;
-
-
-    // }
 
     void CVRP_Pricing::pricePartitioning(const std::vector<double> &pi_vector) {
         auto &cm = cost_mat4_vertex_ref.get();

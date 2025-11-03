@@ -60,6 +60,10 @@ cd ..
 
 # ./bin/cvrp instance/XML15_varDemand/XML15_1121_01.vrp -m 6982 -u 800
 
-./bin/cvrp instance/XML15_varDemand/XML15_1121_19.vrp -m 4182 -u 4182
+# ./bin/cvrp instance/XML15_varDemand/XML15_1121_19.vrp -m 4182 -u 1285
+
+# ./bin/cvrp instance/XML15_varDemand/XML15_1121_19.vrp -m 4182 -u 4182
 
 # ./bin/cvrp instance/XML15_LargeDem/XML15_1141_04.vrp -u 6672
+
+./bin/cvrp instance/dataCVRP/n15_k5_01.vrp -m 2000001 -u 20000001

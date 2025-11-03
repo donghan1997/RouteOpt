@@ -117,7 +117,6 @@ namespace RouteOpt::Application::CVRP {
             // if (!(kj->cost-ki->cost<1e-6)) return false;
             double rc_gap = ki->rc - kj->rc;
             double cost_gap = kj->cost - ki->cost;
-            // double base = dual_vector[dim];  // 不随 i 变化
 
             // 1. beta min and max 先算好，进来之后直接call，判断和RC的关系
             
@@ -127,16 +126,8 @@ namespace RouteOpt::Application::CVRP {
             if (real_rc_gap >= -RC_TOLERANCE) return false;
 
             double range_gap = ki->cost < kj->cost ?  theta_max - ki->cost : theta_max - kj->cost;
-            // std::min(ki->cost,kj->cost);
             if (range_gap >= -RC_TOLERANCE) return false;
 
-            // for (int i = 1; i < dim; ++i) {
-            //     double beta = dual_vector[dim + i] + dual_vector[2 * dim - 1 + i];
-            //     double real_rc_gap = rc_gap + beta * cost_gap;
-            //     if (real_rc_gap >= -RC_TOLERANCE) {
-            //         return false;
-            //     }
-            // }
         } else if (pricing_level == PRICING_LEVEL::HEAVY) {
             if (dir
                     ? tellResTupleRelations<'p'>(ki->res, kj->res)
